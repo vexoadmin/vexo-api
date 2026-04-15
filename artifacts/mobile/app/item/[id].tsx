@@ -19,9 +19,10 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 
-const BG = "#0B0B12";
-const SURFACE = "#11131F";
-const BORDER = "#1A1B2E";
+const BG = "#060814";
+const SURFACE = "#0B1020";
+const BORDER = "rgba(255,255,255,0.10)";
+const CARD_BG = "rgba(255,255,255,0.03)";
 
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
@@ -32,11 +33,6 @@ const PLATFORM_ICONS: Record<string, string> = {
   youtube: "youtube",
   tiktok: "music",
   instagram: "instagram",
-};
-const PLATFORM_COLORS: Record<string, string> = {
-  youtube: "#FF5252",
-  tiktok: "#A0AAFF",
-  instagram: "#E879A0",
 };
 
 function formatDate(ts: number) {
@@ -73,6 +69,7 @@ export default function ItemDetailScreen() {
   const [notes, setNotes] = useState(item?.notes || "");
   const [editingReminder, setEditingReminder] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 20;
 
@@ -84,7 +81,6 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const platformColor = PLATFORM_COLORS[item.platform] ?? "#7C5CFF";
   const hasReminder = !!(item.reminder && item.reminder > Date.now());
 
   function handleOpenLink() {
@@ -133,70 +129,70 @@ export default function ItemDetailScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 1. Hero ── */}
-        <View style={styles.hero}>
-          <LinearGradient
-            colors={[item.thumbnailColor + "CC", item.thumbnailColor + "55", "#0B0B12"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Watermark platform icon */}
-          <Feather
-            name={PLATFORM_ICONS[item.platform] as any}
-            size={100}
-            color="rgba(255,255,255,0.04)"
-            style={styles.heroWatermark}
-          />
-          <View style={styles.heroContent}>
-            {/* Labels row */}
-            <View style={styles.heroLabels}>
-              <View style={[styles.heroBadge, { backgroundColor: platformColor + "22", borderColor: platformColor + "40" }]}>
-                <Feather name={PLATFORM_ICONS[item.platform] as any} size={11} color={platformColor} />
-                <Text style={[styles.heroBadgeText, { color: platformColor }]}>
-                  {PLATFORM_LABELS[item.platform]}
-                </Text>
-              </View>
-              <View style={[styles.heroBadge, { backgroundColor: item.thumbnailColor + "22", borderColor: item.thumbnailColor + "40" }]}>
-                <View style={[styles.heroDot, { backgroundColor: item.thumbnailColor }]} />
-                <Text style={[styles.heroBadgeText, { color: item.thumbnailColor }]}>
-                  {item.category}
-                </Text>
-              </View>
+        {/* ── 1. Hero thumbnail card ── */}
+        <View style={styles.heroCard}>
+          {/* Thumbnail gradient */}
+          <View style={styles.thumb}>
+            <LinearGradient
+              colors={["#22D3EE33", "#8B5CF626", "#D946EF33"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Radial highlight */}
+            <LinearGradient
+              colors={["rgba(255,255,255,0.18)", "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.65, y: 0.65 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Category pill — top left */}
+            <View style={styles.heroCatPill}>
+              <Text style={styles.heroPillText}>{item.category}</Text>
             </View>
-
-            {/* Play button */}
+            {/* Platform pill — top right */}
+            <View style={styles.heroSrcPill}>
+              <Text style={styles.heroSrcText}>{PLATFORM_LABELS[item.platform]}</Text>
+            </View>
+            {/* Center play button */}
             <Pressable onPress={handleOpenLink} style={styles.playWrap}>
               <View style={styles.playRing}>
-                <View style={styles.playInner}>
-                  <Feather name="play" size={26} color="#fff" style={{ marginLeft: 3 }} />
-                </View>
+                <Feather name="play" size={22} color="#fff" style={{ marginLeft: 3 }} />
               </View>
             </Pressable>
           </View>
+
+          {/* Title + date row */}
+          <View style={styles.titleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemTitle}>{item.title}</Text>
+              <Text style={styles.savedDate}>Saved on {formatDate(item.createdAt)}</Text>
+            </View>
+            <Pressable
+              onPress={() => setShowMenu(!showMenu)}
+              style={styles.menuBtn}
+              hitSlop={8}
+            >
+              <Text style={styles.menuDots}>⋯</Text>
+            </Pressable>
+          </View>
+          {showMenu && (
+            <Pressable onPress={handleDelete} style={styles.deleteRow}>
+              <Feather name="trash-2" size={13} color="#EF4444" />
+              <Text style={styles.deleteText}>Delete item</Text>
+            </Pressable>
+          )}
         </View>
 
-        {/* ── 2. Title + date ── */}
-        <View style={styles.titleBlock}>
-          <Text style={styles.itemTitle}>{item.title}</Text>
-          <Text style={styles.savedDate}>Saved {formatDate(item.createdAt)}</Text>
-        </View>
-
-        {/* ── 3. Notes ── */}
+        {/* ── 2. Notes ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={[styles.cardIconWrap, { backgroundColor: "#7C5CFF18" }]}>
-              <Feather name="edit-3" size={14} color="#9B7EFA" />
-            </View>
-            <Text style={styles.cardTitle}>Notes</Text>
+            <Text style={styles.cardLabel}>Personal note</Text>
             <Pressable
-              onPress={() => {
-                if (editingNotes) handleSaveNotes();
-                else setEditingNotes(true);
-              }}
-              style={[styles.actionBtn, editingNotes && styles.actionBtnActive]}
+              onPress={() => { if (editingNotes) handleSaveNotes(); else setEditingNotes(true); }}
+              style={[styles.smallBtn, editingNotes && styles.smallBtnActive]}
             >
-              <Text style={[styles.actionBtnText, editingNotes && { color: "#fff" }]}>
+              <Text style={[styles.smallBtnText, editingNotes && { color: "#fff" }]}>
                 {editingNotes ? "Save" : "Edit"}
               </Text>
             </Pressable>
@@ -206,76 +202,58 @@ export default function ItemDetailScreen() {
               value={notes}
               onChangeText={setNotes}
               placeholder="Write your thoughts..."
-              placeholderTextColor="#4A5170"
+              placeholderTextColor="rgba(255,255,255,0.25)"
               style={styles.notesInput}
               multiline
               textAlignVertical="top"
               autoFocus
             />
           ) : (
-            <Text style={[styles.notesText, !item.notes && { color: "#2A2E45" }]}>
+            <Text style={[styles.notesText, !item.notes && { color: "rgba(255,255,255,0.25)" }]}>
               {item.notes || "No notes yet — tap Edit to add some"}
             </Text>
           )}
         </View>
 
-        {/* ── 4. Reminder ── */}
+        {/* ── 3. Reminder ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={[styles.cardIconWrap, { backgroundColor: "#F59E0B18" }]}>
-              <Feather name="bell" size={14} color="#F59E0B" />
-            </View>
-            <Text style={styles.cardTitle}>Reminder</Text>
+            <Text style={styles.cardLabel}>Reminder</Text>
             {hasReminder && !editingReminder && (
-              <View style={styles.headerBtns}>
-                <Pressable
-                  onPress={() => setEditingReminder(true)}
-                  style={styles.actionBtn}
-                >
-                  <Text style={styles.actionBtnText}>Edit</Text>
+              <View style={styles.reminderActiveBadge}>
+                <Text style={styles.reminderActiveBadgeText}>Active</Text>
+              </View>
+            )}
+            {hasReminder && !editingReminder && (
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                <Pressable onPress={() => setEditingReminder(true)} style={styles.smallBtn}>
+                  <Text style={styles.smallBtnText}>Edit</Text>
                 </Pressable>
-                <Pressable
-                  onPress={handleClearReminder}
-                  style={[styles.actionBtn, { borderColor: "#EF444430" }]}
-                >
-                  <Text style={[styles.actionBtnText, { color: "#EF4444" }]}>Remove</Text>
+                <Pressable onPress={handleClearReminder} style={[styles.smallBtn, { borderColor: "rgba(239,68,68,0.30)" }]}>
+                  <Text style={[styles.smallBtnText, { color: "#EF4444" }]}>Remove</Text>
                 </Pressable>
               </View>
             )}
             {editingReminder && (
-              <Pressable
-                onPress={() => { setEditingReminder(false); setShowDatePicker(false); }}
-                hitSlop={8}
-              >
-                <Feather name="x" size={16} color="#4A5170" />
+              <Pressable onPress={() => { setEditingReminder(false); setShowDatePicker(false); }} hitSlop={8}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.35)" />
               </Pressable>
             )}
           </View>
 
-          {/* Current reminder display */}
           {hasReminder && !editingReminder && (
-            <View style={styles.reminderDisplay}>
-              <Feather name="clock" size={13} color="#F59E0B" />
-              <Text style={styles.reminderDateText}>
-                {formatReminder(item.reminder!)}
-              </Text>
-            </View>
+            <Text style={styles.reminderText}>🔔 {formatReminder(item.reminder!)}</Text>
           )}
 
-          {/* No reminder state */}
           {!hasReminder && !editingReminder && (
-            <Pressable
-              onPress={() => setEditingReminder(true)}
-              style={styles.addReminderBtn}
-            >
-              <Feather name="plus" size={14} color="#7C5CFF" />
+            <Pressable onPress={() => setEditingReminder(true)} style={styles.addReminderBtn}>
+              <Feather name="plus" size={14} color="#A5F3FC" />
               <Text style={styles.addReminderText}>Add reminder</Text>
             </Pressable>
           )}
 
-          {/* Editing / creating reminder */}
           {editingReminder && (
-            <View style={styles.reminderEditArea}>
+            <View style={{ gap: 8 }}>
               <View style={styles.quickChips}>
                 {REMINDER_QUICK.map((opt) => (
                   <Pressable
@@ -290,8 +268,8 @@ export default function ItemDetailScreen() {
                   onPress={() => setShowDatePicker(!showDatePicker)}
                   style={[styles.quickChip, showDatePicker && styles.quickChipActive]}
                 >
-                  <Feather name="calendar" size={12} color={showDatePicker ? "#7C5CFF" : "#9CA3AF"} />
-                  <Text style={[styles.quickChipText, showDatePicker && { color: "#7C5CFF" }]}>
+                  <Feather name="calendar" size={12} color={showDatePicker ? "#A5F3FC" : "rgba(255,255,255,0.45)"} />
+                  <Text style={[styles.quickChipText, showDatePicker && { color: "#A5F3FC" }]}>
                     Custom date
                   </Text>
                 </Pressable>
@@ -311,63 +289,32 @@ export default function ItemDetailScreen() {
           )}
         </View>
 
-        {/* ── 5. Action buttons ── */}
+        {/* ── 4. Action buttons — Edit item + Open source ── */}
         <View style={styles.actionsRow}>
-          <Pressable onPress={handleOpenLink} style={[styles.actionCard, { flex: 1 }]}>
+          <Pressable
+            onPress={() => setEditingNotes(!editingNotes)}
+            style={styles.editBtn}
+          >
+            <Text style={styles.editBtnText}>Edit item</Text>
+          </Pressable>
+          <Pressable onPress={handleOpenLink} style={[styles.openBtn, { flex: 1 }]}>
             <LinearGradient
-              colors={["#7C5CFF", "#4CC9F0"]}
+              colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.actionCardGrad}
+              style={styles.openBtnGrad}
             >
-              <Feather name="external-link" size={16} color="#fff" />
-              <Text style={styles.actionCardText}>Open Source</Text>
+              <Text style={styles.openBtnText}>Open source ↗</Text>
             </LinearGradient>
-          </Pressable>
-          <Pressable
-            onPress={handleDelete}
-            style={styles.deleteCard}
-          >
-            <Feather name="trash-2" size={16} color="#EF4444" />
           </Pressable>
         </View>
 
-        {/* ── 6. AI section ── */}
-        <View style={[styles.card, styles.aiCard]}>
-          <LinearGradient
-            colors={["#6466EF12", "#A56BF708", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.cardHeader}>
-            <LinearGradient
-              colors={["#6466EF", "#A56BF7"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.cardIconWrap}
-            >
-              <Feather name="zap" size={14} color="#fff" />
-            </LinearGradient>
-            <Text style={styles.cardTitle}>AI Insights</Text>
-            <View style={styles.comingSoonBadge}>
-              <Text style={styles.comingSoonText}>SOON</Text>
-            </View>
-          </View>
-          <View style={styles.aiContent}>
-            <View style={styles.aiRow}>
-              <Feather name="file-text" size={13} color="#6466EF60" />
-              <Text style={styles.aiFeatureText}>Auto-generated summary</Text>
-            </View>
-            <View style={styles.aiRow}>
-              <Feather name="list" size={13} color="#6466EF60" />
-              <Text style={styles.aiFeatureText}>Key takeaways</Text>
-            </View>
-            <View style={styles.aiRow}>
-              <Feather name="link" size={13} color="#6466EF60" />
-              <Text style={styles.aiFeatureText}>Related content suggestions</Text>
-            </View>
-          </View>
+        {/* ── 5. AI Future area ── */}
+        <View style={styles.aiArea}>
+          <Text style={styles.aiLabel}>FUTURE AI AREA</Text>
+          <Text style={styles.aiText}>
+            In the future, this area will show smart summaries, ingredients, steps, address, or key points — depending on the content type.
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -376,134 +323,162 @@ export default function ItemDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  content: { gap: 14 },
+  content: { gap: 12, paddingBottom: 20 },
 
-  hero: {
-    height: 220,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  heroWatermark: {
-    position: "absolute",
-    right: -16,
-    top: "10%",
-  },
-  heroContent: {
-    padding: 16,
-    gap: 16,
-  },
-  heroLabels: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  heroBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+  heroCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: SURFACE,
+    borderRadius: 24,
     borderWidth: 1,
-    gap: 5,
+    borderColor: BORDER,
+    padding: 12,
+    gap: 10,
+    overflow: "hidden",
   },
-  heroBadgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-  },
-  heroDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  playWrap: {
-    alignSelf: "center",
-    marginBottom: 4,
-  },
-  playRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.10)",
+  thumb: {
+    height: 160,
+    borderRadius: 18,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
-  playInner: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  heroCatPill: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  heroPillText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.90)",
+  },
+  heroSrcPill: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  heroSrcText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: "#A5F3FC",
+  },
+  playWrap: {
+    shadowColor: "#22D3EE",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+  },
+  playRing: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: "rgba(255,255,255,0.20)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
 
-  titleBlock: {
-    paddingHorizontal: 16,
-    gap: 6,
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 2,
   },
   itemTitle: {
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.6,
-    lineHeight: 30,
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
+    lineHeight: 24,
     color: "#FFFFFF",
   },
   savedDate: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "#4A5170",
+    color: "rgba(255,255,255,0.45)",
+    marginTop: 4,
+  },
+  menuBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginTop: 2,
+  },
+  menuDots: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.80)",
+  },
+  deleteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.25)",
+    backgroundColor: "rgba(239,68,68,0.08)",
+  },
+  deleteText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#EF4444",
   },
 
   card: {
     marginHorizontal: 16,
-    backgroundColor: SURFACE,
+    backgroundColor: CARD_BG,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
     padding: 16,
-    gap: 12,
+    gap: 10,
     overflow: "hidden",
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
-  cardIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
+  cardLabel: {
     flex: 1,
-    color: "#FFFFFF",
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 0.1,
   },
-  headerBtns: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  actionBtn: {
+  smallBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 9,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#0E1020",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  actionBtnActive: {
-    backgroundColor: "#7C5CFF",
-    borderColor: "#7C5CFF",
+  smallBtnActive: {
+    backgroundColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
   },
-  actionBtnText: {
+  smallBtnText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    color: "#9CA3AF",
+    color: "rgba(255,255,255,0.75)",
   },
 
   notesInput: {
-    backgroundColor: "#0E1020",
+    backgroundColor: "rgba(0,0,0,0.20)",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: BORDER,
@@ -519,26 +494,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     lineHeight: 21,
-    color: "#FFFFFF",
+    color: "rgba(255,255,255,0.75)",
   },
 
-  reminderDisplay: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F59E0B10",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#F59E0B20",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  reminderActiveBadge: {
+    backgroundColor: "rgba(34,211,238,0.12)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  reminderDateText: {
-    fontSize: 15,
+  reminderActiveBadgeText: {
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    color: "#F59E0B",
+    color: "#A5F3FC",
+    letterSpacing: 0.4,
   },
-
+  reminderText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(165,243,252,0.85)",
+    lineHeight: 21,
+  },
   addReminderBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -547,18 +523,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#7C5CFF30",
-    backgroundColor: "#7C5CFF0C",
+    borderColor: "rgba(34,211,238,0.25)",
+    backgroundColor: "rgba(34,211,238,0.08)",
     alignSelf: "flex-start",
   },
   addReminderText: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
-    color: "#7C5CFF",
-  },
-
-  reminderEditArea: {
-    gap: 10,
+    color: "#A5F3FC",
   },
   quickChips: {
     flexDirection: "row",
@@ -571,19 +543,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: "#0E1020",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: BORDER,
     gap: 5,
   },
   quickChipActive: {
-    backgroundColor: "#7C5CFF14",
-    borderColor: "#7C5CFF40",
+    backgroundColor: "rgba(34,211,238,0.10)",
+    borderColor: "rgba(34,211,238,0.30)",
   },
   quickChipText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: "#9CA3AF",
+    color: "rgba(255,255,255,0.65)",
   },
 
   actionsRow: {
@@ -591,60 +563,64 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     gap: 10,
   },
-  actionCard: {
+  editBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.85)",
+  },
+  openBtn: {
     borderRadius: 18,
     overflow: "hidden",
+    shadowColor: "#22D3EE",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.30,
+    shadowRadius: 18,
   },
-  actionCardGrad: {
+  openBtnGrad: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
-    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    gap: 6,
   },
-  actionCardText: {
+  openBtnText: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-  },
-  deleteCard: {
-    width: 54,
-    borderRadius: 18,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: "#EF444430",
-    alignItems: "center",
-    justifyContent: "center",
   },
 
-  aiCard: {
+  aiArea: {
+    marginHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "rgba(165,243,252,0.25)",
+    backgroundColor: "rgba(34,211,238,0.05)",
+    padding: 16,
+    gap: 8,
     marginBottom: 8,
   },
-  aiContent: {
-    gap: 8,
-  },
-  aiRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  aiFeatureText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#3A3D5C",
-  },
-  comingSoonBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#6466EF30",
-    backgroundColor: "#6466EF18",
-  },
-  comingSoonText: {
+  aiLabel: {
     fontSize: 9,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.8,
-    color: "#9B7EFA",
+    letterSpacing: 1.8,
+    color: "rgba(165,243,252,0.70)",
+  },
+  aiText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 20,
+    color: "rgba(165,243,252,0.75)",
   },
 });

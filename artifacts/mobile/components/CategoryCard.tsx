@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
@@ -9,11 +10,12 @@ interface CategoryCardProps {
   category: Category;
   itemCount: number;
   onPress: () => void;
+  index?: number;
 }
 
-export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps) {
+export function CategoryCard({ category, itemCount, onPress, index = 0 }: CategoryCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
-  const c = category.color;
+  const isEven = index % 2 === 0;
 
   function handlePressIn() {
     Animated.spring(scale, { toValue: 0.955, useNativeDriver: true, speed: 45, bounciness: 0 }).start();
@@ -32,18 +34,35 @@ export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={styles.card}
+        style={styles.cardOuter}
       >
-        <View style={[styles.absoluteFill, { backgroundColor: c + "08" }]} />
+        {isEven ? (
+          <LinearGradient
+            colors={["#D946EF1A", "#8B5CF61A", "#22D3EE1A"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : (
+          <LinearGradient
+            colors={["rgba(255,255,255,0.06)", "rgba(255,255,255,0.02)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
 
-        <View style={[styles.iconCircle, { backgroundColor: c + "18" }]}>
-          <Feather name={category.icon as any} size={22} color={c} />
+        {/* Top row: icon + count badge */}
+        <View style={styles.topRow}>
+          <Feather name={category.icon as any} size={26} color="#fff" style={{ opacity: 0.85 }} />
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>{itemCount} saved</Text>
+          </View>
         </View>
 
-        <Text style={styles.name} numberOfLines={1}>{category.name}</Text>
-        <Text style={styles.count}>
-          {itemCount} {itemCount === 1 ? "video" : "videos"}
-        </Text>
+        {/* Name + description */}
+        <Text style={styles.name}>{category.name}</Text>
+        <Text style={styles.desc}>Quick access to everything saved here</Text>
       </Pressable>
     </Animated.View>
   );
@@ -71,11 +90,14 @@ export function AddCategoryCard({ onPress }: { onPress: () => void }) {
         onPressOut={handlePressOut}
         style={styles.addCard}
       >
-        <View style={styles.addIconCircle}>
-          <Feather name="plus" size={20} color="#7C5CFF" />
+        <View style={styles.topRow}>
+          <Text style={styles.addPlus}>＋</Text>
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>New</Text>
+          </View>
         </View>
-        <Text style={styles.addName}>New</Text>
-        <Text style={styles.addSub}>Collection</Text>
+        <Text style={styles.addName}>Add Category</Text>
+        <Text style={styles.addDesc}>Create a new custom category</Text>
       </Pressable>
     </Animated.View>
   );
@@ -86,77 +108,87 @@ const styles = StyleSheet.create({
     width: "50%",
     padding: 5,
   },
-  card: {
-    backgroundColor: "#11131F",
-    borderRadius: 22,
+  cardOuter: {
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#1A1B2E",
-    paddingHorizontal: 14,
-    paddingVertical: 18,
-    alignItems: "flex-start",
-    gap: 8,
-    minHeight: 120,
+    borderColor: "rgba(255,255,255,0.10)",
+    padding: 16,
     overflow: "hidden",
+    minHeight: 130,
+    gap: 4,
   },
-  absoluteFill: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  topRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  name: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.2,
-    color: "#FFFFFF",
+  countBadge: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  count: {
+  countText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: "#9CA3AF",
+    color: "rgba(255,255,255,0.55)",
+  },
+  name: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  desc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.45)",
+    lineHeight: 17,
+    marginTop: 2,
   },
 
   addCard: {
-    backgroundColor: "transparent",
-    borderRadius: 22,
+    borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: "#7C5CFF30",
     borderStyle: "dashed",
-    paddingHorizontal: 14,
-    paddingVertical: 18,
-    alignItems: "flex-start",
-    gap: 8,
-    minHeight: 120,
-    shadowColor: "#7C5CFF",
+    borderColor: "rgba(165,243,252,0.30)",
+    backgroundColor: "rgba(34,211,238,0.10)",
+    padding: 16,
+    overflow: "hidden",
+    minHeight: 130,
+    gap: 4,
+    shadowColor: "#22D3EE",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
   },
-  addIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "#7C5CFF18",
-    borderWidth: 1,
-    borderColor: "#7C5CFF30",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
+  addPlus: {
+    fontSize: 26,
+    color: "#A5F3FC",
   },
-  addName: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.2,
-    color: "#7C5CFF",
+  newBadge: {
+    backgroundColor: "rgba(0,0,0,0.15)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  addSub: {
+  newBadgeText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: "#7C5CFF80",
+    color: "#A5F3FC",
+  },
+  addName: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "#A5F3FC",
+    letterSpacing: -0.2,
+  },
+  addDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(165,243,252,0.70)",
+    lineHeight: 17,
+    marginTop: 2,
   },
 });

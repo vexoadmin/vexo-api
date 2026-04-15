@@ -16,14 +16,14 @@ export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddBu
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.3, duration: 1600, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 1600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.35, duration: 1800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 1800, useNativeDriver: true }),
       ])
     ).start();
   }, []);
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.86, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   }
   function handlePressOut() {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 14 }).start();
@@ -35,20 +35,11 @@ export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddBu
 
   return (
     <View style={[styles.anchor, { bottom: bottomOffset }]}>
-      <Animated.View
-        style={[
-          styles.pulseRing,
-          { transform: [{ scale: pulse }] },
-        ]}
-      />
+      <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulse }] }]} />
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Pressable
-          onPress={handlePress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-        >
+        <Pressable onPress={handlePress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
           <LinearGradient
-            colors={["#6466EF", "#784BEA", "#A56BF7"]}
+            colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.btn}
@@ -73,8 +64,8 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: "#784BEA",
-    opacity: 0.22,
+    backgroundColor: "#22D3EE",
+    opacity: 0.18,
   },
   btn: {
     width: 58,
@@ -82,10 +73,10 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#6466EF",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.8,
-    shadowRadius: 22,
+    shadowColor: "#22D3EE",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
     elevation: 16,
   },
 });

@@ -22,9 +22,9 @@ import { VexoLogo } from "@/components/VexoLogo";
 import { VideoCard } from "@/components/VideoCard";
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 
-const BG = "#0B0B12";
-const SURFACE = "#11131F";
-const BORDER = "#1A1B2E";
+const BG = "#060814";
+const BORDER = "rgba(255,255,255,0.10)";
+const CARD_BG = "rgba(255,255,255,0.04)";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -77,10 +77,6 @@ export default function HomeScreen() {
     () => ["All", ...categories.map((c) => c.name)],
     [categories]
   );
-  const categoryColorMap = useMemo(
-    () => Object.fromEntries(categories.map((c) => [c.name, c.color])),
-    [categories]
-  );
 
   const isEmpty = displayedItems.length === 0;
   const isGlobalEmpty = items.length === 0;
@@ -93,6 +89,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Ambient glow blobs */}
+      <View style={styles.glowTopLeft} pointerEvents="none" />
+      <View style={styles.glowTopRight} pointerEvents="none" />
+
       <FlatList
         data={[1]}
         keyExtractor={() => "content"}
@@ -102,14 +102,6 @@ export default function HomeScreen() {
           <View>
             {/* ── Header ── */}
             <View style={[styles.header, { paddingTop: topPadding + 14 }]}>
-              <LinearGradient
-                colors={["#7C5CFF14", "transparent"]}
-                start={{ x: 0.3, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-              />
-
               {/* Title row: "Vexo Save" left, logo right */}
               <View style={styles.headerTop}>
                 <View style={styles.headerLeft}>
@@ -132,7 +124,7 @@ export default function HomeScreen() {
                   <Feather
                     name={searchOpen ? "x" : "search"}
                     size={17}
-                    color={searchOpen ? "#7C5CFF" : "#9CA3AF"}
+                    color={searchOpen ? "#A5F3FC" : "rgba(255,255,255,0.80)"}
                   />
                 </Pressable>
               </View>
@@ -140,19 +132,19 @@ export default function HomeScreen() {
               {/* Collapsible search bar */}
               <Animated.View style={[styles.searchWrap, { height: searchBarHeight, opacity: searchBarOpacity }]}>
                 <View style={styles.searchInner}>
-                  <Feather name="search" size={14} color="#4A5170" />
+                  <Feather name="search" size={14} color="rgba(255,255,255,0.35)" />
                   <TextInput
                     ref={searchRef}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     placeholder="Search saved videos..."
-                    placeholderTextColor="#4A5170"
+                    placeholderTextColor="rgba(255,255,255,0.30)"
                     style={styles.searchInput}
                     returnKeyType="search"
                   />
                   {searchQuery.length > 0 && (
                     <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
-                      <Feather name="x-circle" size={14} color="#4A5170" />
+                      <Feather name="x-circle" size={14} color="rgba(255,255,255,0.35)" />
                     </Pressable>
                   )}
                 </View>
@@ -169,14 +161,10 @@ export default function HomeScreen() {
               {categoryList.map((name, idx) => (
                 <View
                   key={name}
-                  style={{
-                    marginLeft: idx === 0 ? 20 : 6,
-                    marginRight: 0,
-                  }}
+                  style={{ marginLeft: idx === 0 ? 20 : 8, marginRight: 0 }}
                 >
                   <CategoryChip
                     label={name}
-                    color={name === "All" ? "#7C5CFF" : categoryColorMap[name]}
                     selected={selectedCategory === name}
                     onPress={() => {
                       Haptics.selectionAsync();
@@ -185,14 +173,13 @@ export default function HomeScreen() {
                   />
                 </View>
               ))}
-              {/* + New chip */}
-              <View style={{ marginLeft: 6, marginRight: 20 }}>
+              {/* + Add dashed chip */}
+              <View style={{ marginLeft: 8, marginRight: 20 }}>
                 <Pressable
                   onPress={() => router.push("/add")}
                   style={styles.addChip}
                 >
-                  <Feather name="plus" size={11} color="#7C5CFF" />
-                  <Text style={styles.addChipText}>New</Text>
+                  <Text style={styles.addChipText}>+ Add</Text>
                 </Pressable>
               </View>
             </ScrollView>
@@ -256,18 +243,15 @@ export default function HomeScreen() {
 function GlobalEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <View style={emptyS.wrap}>
-      <LinearGradient colors={["#7C5CFF22", "#4CC9F010"]} style={emptyS.iconRing}>
-        <Feather name="bookmark" size={34} color="#7C5CFF" style={{ opacity: 0.85 }} />
-      </LinearGradient>
+      <View style={emptyS.iconRing}>
+        <Feather name="bookmark" size={32} color="#A5F3FC" style={{ opacity: 0.7 }} />
+      </View>
       <Text style={emptyS.title}>Your library is empty</Text>
-      <Text style={emptyS.desc}>
-        Save your first video from YouTube,{"\n"}TikTok, or Instagram.
-      </Text>
+      <Text style={emptyS.desc}>Save your first video from YouTube,{"\n"}TikTok, or Instagram.</Text>
       <Pressable onPress={onAdd} style={({ pressed }) => [emptyS.cta, { opacity: pressed ? 0.8 : 1 }]}>
         <LinearGradient
-          colors={["#7C5CFF", "#4CC9F0"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={emptyS.ctaGrad}
         >
           <Feather name="plus" size={15} color="#fff" />
@@ -278,45 +262,21 @@ function GlobalEmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function FilteredEmptyState({
-  selectedCategory, searchQuery, onAdd, onClear,
-}: {
-  selectedCategory: string;
-  searchQuery: string;
-  onAdd: () => void;
-  onClear: () => void;
-}) {
+function FilteredEmptyState({ selectedCategory, searchQuery, onAdd, onClear }: { selectedCategory: string; searchQuery: string; onAdd: () => void; onClear: () => void; }) {
   const isSearch = !!searchQuery.trim();
   return (
     <View style={emptyS.wrap}>
-      <View style={emptyS.iconRingDark}>
-        <Feather name={isSearch ? "search" : "folder"} size={30} color="#4A5170" />
+      <View style={emptyS.iconRing}>
+        <Feather name={isSearch ? "search" : "folder"} size={28} color="rgba(255,255,255,0.30)" />
       </View>
-      <Text style={emptyS.title}>
-        {isSearch ? "No results found" : `No ${selectedCategory} videos`}
-      </Text>
-      <Text style={emptyS.desc}>
-        {isSearch
-          ? `Nothing matched "${searchQuery}"`
-          : `No ${selectedCategory} videos saved yet`}
-      </Text>
+      <Text style={emptyS.title}>{isSearch ? "No results found" : `No ${selectedCategory} videos`}</Text>
+      <Text style={emptyS.desc}>{isSearch ? `Nothing matched "${searchQuery}"` : `No ${selectedCategory} videos saved yet`}</Text>
       <View style={emptyS.row}>
-        <Pressable
-          onPress={onClear}
-          style={({ pressed }) => [emptyS.secondary, { opacity: pressed ? 0.8 : 1 }]}
-        >
+        <Pressable onPress={onClear} style={({ pressed }) => [emptyS.secondary, { opacity: pressed ? 0.8 : 1 }]}>
           <Text style={emptyS.secondaryText}>Clear</Text>
         </Pressable>
-        <Pressable
-          onPress={onAdd}
-          style={({ pressed }) => [emptyS.cta, { flex: 1, opacity: pressed ? 0.8 : 1 }]}
-        >
-          <LinearGradient
-            colors={["#7C5CFF", "#4CC9F0"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={emptyS.ctaGrad}
-          >
+        <Pressable onPress={onAdd} style={({ pressed }) => [emptyS.cta, { flex: 1, opacity: pressed ? 0.8 : 1 }]}>
+          <LinearGradient colors={["#D946EF", "#8B5CF6", "#22D3EE"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={emptyS.ctaGrad}>
             <Feather name="plus" size={14} color="#fff" />
             <Text style={emptyS.ctaText}>Add video</Text>
           </LinearGradient>
@@ -328,26 +288,43 @@ function FilteredEmptyState({
 
 const emptyS = StyleSheet.create({
   wrap: { alignItems: "center", paddingTop: 72, paddingHorizontal: 32, gap: 12 },
-  iconRing: { width: 84, height: 84, borderRadius: 42, alignItems: "center", justifyContent: "center", marginBottom: 8 },
-  iconRingDark: { width: 84, height: 84, borderRadius: 42, backgroundColor: "#11131F", borderWidth: 1, borderColor: "#1A1B2E", alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  iconRing: { width: 84, height: 84, borderRadius: 42, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.10)", alignItems: "center", justifyContent: "center", marginBottom: 8 },
   title: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.4, textAlign: "center", color: "#FFFFFF" },
-  desc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20, color: "#9CA3AF" },
+  desc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20, color: "rgba(255,255,255,0.55)" },
   row: { flexDirection: "row", gap: 8, marginTop: 6, alignSelf: "stretch" },
-  cta: { borderRadius: 14, overflow: "hidden" },
+  cta: { borderRadius: 16, overflow: "hidden" },
   ctaGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 20, paddingVertical: 14, gap: 6 },
   ctaText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  secondary: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#1A1B2E", backgroundColor: "#11131F", alignItems: "center", justifyContent: "center" },
-  secondaryText: { fontSize: 13, fontFamily: "Inter_500Medium", color: "#9CA3AF" },
+  secondary: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.10)", backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" },
+  secondaryText: { fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.60)" },
 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
+  glowTopLeft: {
+    position: "absolute",
+    top: -40,
+    left: -20,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(217,70,239,0.12)",
+  },
+  glowTopRight: {
+    position: "absolute",
+    top: 120,
+    right: -30,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: "rgba(34,211,238,0.06)",
+  },
+
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
     overflow: "hidden",
-    gap: 0,
   },
   headerTop: {
     flexDirection: "row",
@@ -371,44 +348,37 @@ const styles = StyleSheet.create({
     letterSpacing: -1.8,
     includeFontPadding: false,
   },
-  titleWhite: {
-    color: "#FFFFFF",
-  },
-  titleAccent: {
-    color: "#7C5CFF",
-  },
+  titleWhite: { color: "#FFFFFF" },
+  titleAccent: { color: "#8B5CF6" },
   tagline: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "#3A3F5C",
-    letterSpacing: 0.2,
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 0.1,
   },
   searchIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: SURFACE,
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: "rgba(255,255,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
   },
   searchIconBtnActive: {
-    backgroundColor: "#7C5CFF14",
-    borderColor: "#7C5CFF40",
+    backgroundColor: "rgba(34,211,238,0.08)",
+    borderColor: "rgba(34,211,238,0.30)",
   },
 
-  searchWrap: {
-    overflow: "hidden",
-    marginTop: 12,
-  },
+  searchWrap: { overflow: "hidden", marginTop: 12 },
   searchInner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: SURFACE,
-    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: "rgba(255,255,255,0.10)",
     paddingHorizontal: 14,
     paddingVertical: 13,
     gap: 10,
@@ -422,24 +392,22 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  chipsScroll: { marginTop: 18, marginBottom: 2 },
+  chipsScroll: { marginTop: 16, marginBottom: 2 },
   chipsContent: { flexDirection: "row", alignItems: "center" },
 
   addChip: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "#7C5CFF12",
+    paddingVertical: 8,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#7C5CFF30",
-    gap: 5,
+    borderStyle: "dashed",
+    borderColor: "rgba(165,243,252,0.30)",
+    backgroundColor: "rgba(34,211,238,0.10)",
   },
   addChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: "#7C5CFF",
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#A5F3FC",
   },
 
   sectionRow: {
@@ -453,13 +421,13 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    color: "#2A2E45",
-    letterSpacing: 1.1,
+    color: "rgba(255,255,255,0.25)",
+    letterSpacing: 1.2,
   },
   sectionCount: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
-    color: "#252840",
+    color: "rgba(255,255,255,0.20)",
   },
 
   gridWrap: { paddingHorizontal: 14 },

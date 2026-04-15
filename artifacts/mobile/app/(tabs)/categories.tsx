@@ -7,7 +7,6 @@ import {
   FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,12 +17,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddCategoryCard, CategoryCard } from "@/components/CategoryCard";
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 
-const BG = "#0B0B12";
-const SURFACE = "#11131F";
-const BORDER = "#1A1B2E";
+const BG = "#060814";
+const SURFACE = "#0B1020";
+const BORDER = "rgba(255,255,255,0.10)";
 
 const CATEGORY_COLORS = [
-  "#7C5CFF", "#4CC9F0", "#A78BFA", "#F472B6",
+  "#D946EF", "#8B5CF6", "#22D3EE", "#F472B6",
   "#34D399", "#FBBF24", "#60A5FA", "#F87171",
 ];
 const CATEGORY_ICONS = [
@@ -72,298 +71,212 @@ export default function CategoriesScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
+      {/* Ambient glow */}
+      <View style={styles.glowBottom} pointerEvents="none" />
+
+      <FlatList
+        data={[1]}
+        keyExtractor={() => "content"}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: topPadding + 14, paddingBottom: bottomPadding },
-        ]}
-      >
-        {/* ── Header ── */}
-        <View style={styles.headerWrap}>
-          <LinearGradient
-            colors={["#7C5CFF10", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-          <Text style={styles.welcomeText}>Browse &amp; manage</Text>
-          <Text style={styles.title}>Collections</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statChip}>
-              <Feather name="layers" size={11} color="#7C5CFF" />
-              <Text style={styles.statText}>{categories.length} collections</Text>
+        contentContainerStyle={[styles.content, { paddingTop: topPadding + 14, paddingBottom: bottomPadding }]}
+        ListHeaderComponent={
+          <View>
+            {/* ── Header ── */}
+            <View style={styles.headerWrap}>
+              <Text style={styles.subtitle}>Browse &amp; manage</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>Collections</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statChip}>
+                    <Feather name="layers" size={11} color="#A5F3FC" />
+                    <Text style={styles.statText}>{categories.length}</Text>
+                  </View>
+                  <View style={styles.statChip}>
+                    <Feather name="bookmark" size={11} color="#A5F3FC" />
+                    <Text style={styles.statText}>{totalVideos}</Text>
+                  </View>
+                </View>
+              </View>
             </View>
-            <View style={styles.statChip}>
-              <Feather name="bookmark" size={11} color="#4CC9F0" />
-              <Text style={styles.statText}>{totalVideos} videos</Text>
-            </View>
+
+            {/* ── Add form ── */}
+            {showAdd && (
+              <View style={styles.addForm}>
+                <View style={styles.addFormHeader}>
+                  <LinearGradient
+                    colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.addFormIconWrap}
+                  >
+                    <Feather name="folder-plus" size={16} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.addFormTitle}>New Collection</Text>
+                  <Pressable onPress={() => { setShowAdd(false); setNewName(""); }} hitSlop={8}>
+                    <Feather name="x" size={18} color="rgba(255,255,255,0.35)" />
+                  </Pressable>
+                </View>
+
+                <TextInput
+                  value={newName}
+                  onChangeText={setNewName}
+                  placeholder="Collection name..."
+                  placeholderTextColor="rgba(255,255,255,0.28)"
+                  style={styles.formInput}
+                  autoFocus
+                />
+
+                <Text style={styles.formLabel}>COLOR</Text>
+                <View style={styles.swatchRow}>
+                  {CATEGORY_COLORS.map((c, i) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => setSelectedColor(i)}
+                      style={[styles.colorSwatch, { backgroundColor: c }, selectedColor === i && styles.swatchSelected]}
+                    >
+                      {selectedColor === i && <Feather name="check" size={11} color="#fff" />}
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={styles.formLabel}>ICON</Text>
+                <View style={styles.swatchRow}>
+                  {CATEGORY_ICONS.map((icon, i) => (
+                    <Pressable
+                      key={icon}
+                      onPress={() => setSelectedIcon(i)}
+                      style={[styles.iconSwatch, selectedIcon === i && { backgroundColor: CATEGORY_COLORS[selectedColor] + "20", borderColor: CATEGORY_COLORS[selectedColor] + "60" }]}
+                    >
+                      <Feather name={icon as any} size={16} color={selectedIcon === i ? CATEGORY_COLORS[selectedColor] : "rgba(255,255,255,0.35)"} />
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Pressable onPress={handleAdd} style={{ borderRadius: 18, overflow: "hidden" }}>
+                  <LinearGradient
+                    colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.createBtn}
+                  >
+                    <Feather name="plus" size={15} color="#fff" />
+                    <Text style={styles.createBtnText}>Create Collection</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            )}
+
+            {/* ── Section label ── */}
+            <Text style={styles.sectionLabel}>ALL COLLECTIONS</Text>
           </View>
-        </View>
-
-        {/* ── Add form (expandable) ── */}
-        {showAdd && (
-          <View style={styles.addForm}>
-            <View style={styles.addFormHeader}>
-              <LinearGradient
-                colors={["#7C5CFF", "#4CC9F0"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.addFormIconWrap}
-              >
-                <Feather name="folder-plus" size={16} color="#fff" />
-              </LinearGradient>
-              <Text style={styles.addFormTitle}>New Collection</Text>
-              <Pressable
-                onPress={() => { setShowAdd(false); setNewName(""); }}
-                hitSlop={8}
-              >
-                <Feather name="x" size={18} color="#4A5170" />
-              </Pressable>
-            </View>
-
-            <TextInput
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Collection name..."
-              placeholderTextColor="#4A5170"
-              style={styles.formInput}
-              autoFocus
-            />
-
-            <Text style={styles.formLabel}>COLOR</Text>
-            <View style={styles.swatchRow}>
-              {CATEGORY_COLORS.map((c, i) => (
-                <Pressable
-                  key={c}
-                  onPress={() => setSelectedColor(i)}
-                  style={[
-                    styles.colorSwatch,
-                    { backgroundColor: c },
-                    selectedColor === i && styles.swatchSelected,
-                  ]}
-                >
-                  {selectedColor === i && (
-                    <Feather name="check" size={11} color="#fff" />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.formLabel}>ICON</Text>
-            <View style={styles.swatchRow}>
-              {CATEGORY_ICONS.map((icon, i) => (
-                <Pressable
-                  key={icon}
-                  onPress={() => setSelectedIcon(i)}
-                  style={[
-                    styles.iconSwatch,
-                    selectedIcon === i && {
-                      backgroundColor: CATEGORY_COLORS[selectedColor] + "20",
-                      borderColor: CATEGORY_COLORS[selectedColor] + "60",
-                    },
-                  ]}
-                >
-                  <Feather
-                    name={icon as any}
-                    size={16}
-                    color={selectedIcon === i ? CATEGORY_COLORS[selectedColor] : "#4A5170"}
-                  />
-                </Pressable>
-              ))}
-            </View>
-
-            <Pressable
-              onPress={handleAdd}
-              style={{ borderRadius: 16, overflow: "hidden" }}
-            >
-              <LinearGradient
-                colors={["#7C5CFF", "#4CC9F0"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.createBtn}
-              >
-                <Feather name="plus" size={15} color="#fff" />
-                <Text style={styles.createBtnText}>Create Collection</Text>
-              </LinearGradient>
-            </Pressable>
+        }
+        renderItem={() => (
+          <View style={styles.grid}>
+            {categories.map((category, i) => (
+              <CategoryCard
+                key={category.id}
+                category={category}
+                itemCount={categoryItemCounts[category.name] || 0}
+                onPress={() => router.push(`/category/${category.id}`)}
+                index={i}
+              />
+            ))}
+            <AddCategoryCard onPress={openAdd} />
+            {(categories.length + 1) % 2 !== 0 && <View style={styles.gridPad} />}
           </View>
         )}
-
-        {/* ── Section label ── */}
-        <Text style={styles.sectionLabel}>ALL COLLECTIONS</Text>
-
-        {/* ── Grid ── */}
-        <View style={styles.grid}>
-          {categories.map((category, i) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              itemCount={categoryItemCounts[category.name] || 0}
-              onPress={() => router.push(`/category/${category.id}`)}
-            />
-          ))}
-          <AddCategoryCard onPress={openAdd} />
-          {/* Pad to even columns */}
-          {(categories.length + 1) % 2 !== 0 && <View style={styles.gridPad} />}
-        </View>
-      </ScrollView>
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
+  container: { flex: 1, backgroundColor: BG },
+  glowBottom: {
+    position: "absolute",
+    bottom: 60,
+    left: "33%",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(139,92,246,0.07)",
   },
-  content: {
-    paddingHorizontal: 15,
-    gap: 0,
-  },
+  content: { paddingHorizontal: 15 },
 
-  headerWrap: {
-    overflow: "hidden",
-    marginBottom: 24,
-    paddingHorizontal: 5,
-  },
-  welcomeText: {
-    fontSize: 13,
+  headerWrap: { paddingHorizontal: 5, marginBottom: 24 },
+  subtitle: {
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "#4A5170",
-    letterSpacing: 0.2,
-    marginBottom: 2,
+    color: "rgba(255,255,255,0.45)",
+    marginBottom: 4,
+    letterSpacing: 0.1,
   },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: {
     fontSize: 34,
     fontFamily: "Inter_700Bold",
     letterSpacing: -1.6,
     color: "#FFFFFF",
-    marginBottom: 14,
   },
-  statsRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  statsRow: { flexDirection: "row", gap: 8 },
   statChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
-    backgroundColor: SURFACE,
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: BORDER,
   },
   statText: {
     fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: "#9CA3AF",
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.55)",
   },
 
   addForm: {
     backgroundColor: SURFACE,
-    borderRadius: 22,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: BORDER,
     padding: 18,
     marginBottom: 20,
     gap: 12,
   },
-  addFormHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 4,
-  },
-  addFormIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addFormTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: "#FFFFFF",
-  },
+  addFormHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
+  addFormIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  addFormTitle: { flex: 1, fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#FFFFFF" },
   formInput: {
-    backgroundColor: "#0E1020",
+    backgroundColor: "rgba(0,0,0,0.30)",
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: "#FFFFFF",
   },
-  formLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1,
-    color: "#4A5170",
-  },
-  swatchRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  colorSwatch: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  swatchSelected: {
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
+  formLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1, color: "rgba(255,255,255,0.30)" },
+  swatchRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  colorSwatch: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  swatchSelected: { borderWidth: 2, borderColor: "#fff" },
   iconSwatch: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#0E1020",
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1, borderColor: BORDER,
+    alignItems: "center", justifyContent: "center",
   },
-  createBtn: {
-    paddingVertical: 14,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-  },
-  createBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
+  createBtn: { paddingVertical: 15, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  createBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   sectionLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1.2,
-    color: "#2A2E45",
-    marginBottom: 10,
-    paddingHorizontal: 5,
+    fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1.2,
+    color: "rgba(255,255,255,0.20)", marginBottom: 10, paddingHorizontal: 5,
   },
 
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginHorizontal: -5,
-  },
-  gridPad: {
-    width: "50%",
-    padding: 5,
-  },
+  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },
+  gridPad: { width: "50%", padding: 5 },
 });

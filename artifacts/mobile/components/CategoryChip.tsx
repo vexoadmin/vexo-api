@@ -8,6 +8,7 @@ interface CategoryChipProps {
   color?: string;
   selected: boolean;
   onPress: () => void;
+  icon?: string;
 }
 
 export function CategoryChip({ label, selected, onPress }: CategoryChipProps) {
@@ -32,10 +33,10 @@ export function CategoryChip({ label, selected, onPress }: CategoryChipProps) {
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-          style={{ borderRadius: 20 }}
+          style={styles.selectedOuter}
         >
           <LinearGradient
-            colors={["#7C5CFF", "#4CC9F0"]}
+            colors={["#D946EF33", "#8B5CF633", "#22D3EE33"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.selectedPill}
@@ -64,35 +65,41 @@ export function CategoryChip({ label, selected, onPress }: CategoryChipProps) {
 
 const styles = StyleSheet.create({
   glowWrap: {
-    shadowColor: "#7C5CFF",
+    shadowColor: "#D946EF",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
     elevation: 5,
   },
+  selectedOuter: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(217,70,239,0.40)",
+  },
   selectedPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
   },
   selectedText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
     color: "#fff",
     letterSpacing: 0.1,
   },
   pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "#11131F",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "#1A1B2E",
+    borderColor: "rgba(255,255,255,0.10)",
   },
   pillText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "#4A5170",
+    color: "rgba(255,255,255,0.80)",
     letterSpacing: 0.1,
   },
 });

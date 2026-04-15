@@ -26,10 +26,20 @@ Mobile app for saving and organizing video links from TikTok, Instagram, and You
 
 ## Design
 
-- Dark mode with deep navy background (#0F0F1A)
-- Purple (#8B5CF6), blue (#3B82F6), cyan (#06B6D4) gradient accents
-- Rounded cards (16px radius)
-- Floating gradient add button
+- Ultra-dark background: #060814 (deeper blue-black)
+- Brand gradient: Fuchsia (#D946EF) → Violet (#8B5CF6) → Cyan (#22D3EE)
+- Glass card borders: rgba(255,255,255,0.10) on rgba(255,255,255,0.04) backgrounds
+- Card thumbnails: fuchsia→violet→cyan gradient with radial top-left highlight
+- Category pills inside thumbnails (frosted glass, bottom-left)
+- Source label in cyan (#A5F3FC) text
+- Active chip: fuchsia gradient border + glow; inactive: white/10 border
+- "+ Add" chip: dashed cyan border + cyan tint
+- CategoryCard: even cards get fuchsia/violet/cyan gradient tint; odd get subtle white gradient
+- Add Category card: dashed cyan border + cyan tint
+- Item detail: hero thumbnail card with category + source frosted pills; "Edit item" border button + "Open source ↗" gradient button; AI area has dashed cyan border
+- Reminder pills: 2×2 grid layout; active = gradient glow; custom = dashed cyan
+- FAB: fuchsia→violet→cyan gradient with cyan glow
+- Ambient glow blobs (fuchsia top-left, cyan top-right, violet bottom)
 - Inter font family
 
 ## Key Files
