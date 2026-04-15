@@ -19,6 +19,21 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  return "https://" + url;
+}
+
+function openUrl(url: string) {
+  const full = normalizeUrl(url);
+  if (Platform.OS === "web") {
+    window.open(full, "_blank");
+  } else {
+    Linking.openURL(full);
+  }
+}
+
 const BG = "#060814";
 const SURFACE = "#0B1020";
 const BORDER = "rgba(255,255,255,0.10)";
@@ -85,7 +100,7 @@ export default function ItemDetailScreen() {
 
   function handleOpenLink() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Linking.openURL(item!.url);
+    openUrl(item!.url);
   }
 
   function handleSaveNotes() {

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
@@ -51,6 +51,13 @@ function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null 
   return null;
 }
 
+function normalizeUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return "https://" + trimmed;
+}
+
 const REMINDER_OPTIONS = [
   { label: "Tomorrow",  getValue: () => Date.now() + 86400000 },
   {
@@ -84,7 +91,7 @@ export default function AddScreen() {
     if (!detectedPlatform) { Alert.alert("Invalid Link", "Please enter a YouTube, TikTok, or Instagram link"); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addItem({
-      url: url.trim(),
+      url: normalizeUrl(url),
       title: title.trim(),
       platform: detectedPlatform,
       category: selectedCategory,
@@ -103,6 +110,20 @@ export default function AddScreen() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          title: "Save Video",
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={10}
+              style={{ paddingHorizontal: 4 }}
+            >
+              <Text style={styles.cancelBtn}>Cancel</Text>
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
@@ -414,6 +435,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 9, gap: 8,
   },
   reminderSetText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium", color: "#A5F3FC" },
+
+  cancelBtn: {
+    fontSize: 16,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.60)",
+  },
 
   saveWrap: {
     borderRadius: 18, overflow: "hidden", marginTop: 4,
