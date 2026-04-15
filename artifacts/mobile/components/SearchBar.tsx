@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -10,12 +10,22 @@ interface SearchBarProps {
   placeholder?: string;
 }
 
-export function SearchBar({ value, onChangeText, placeholder = "Search saved videos..." }: SearchBarProps) {
+export function SearchBar({ value, onChangeText, placeholder = "Search videos..." }: SearchBarProps) {
   const colors = useColors();
+  const [focused, setFocused] = useState(false);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-      <Feather name="search" size={16} color={colors.mutedForeground} />
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.secondary,
+          borderColor: focused ? "#784BEA88" : colors.border,
+          shadowColor: focused ? "#784BEA" : "transparent",
+        },
+      ]}
+    >
+      <Feather name="search" size={15} color={focused ? "#A56BF7" : colors.mutedForeground} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -23,10 +33,12 @@ export function SearchBar({ value, onChangeText, placeholder = "Search saved vid
         placeholderTextColor={colors.mutedForeground}
         style={[styles.input, { color: colors.foreground }]}
         returnKeyType="search"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       />
       {value.length > 0 && (
-        <Pressable onPress={() => onChangeText("")} hitSlop={8}>
-          <Feather name="x-circle" size={16} color={colors.mutedForeground} />
+        <Pressable onPress={() => onChangeText("")} hitSlop={10}>
+          <Feather name="x-circle" size={15} color={colors.mutedForeground} />
         </Pressable>
       )}
     </View>
@@ -37,11 +49,15 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 10,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 0,
   },
   input: {
     flex: 1,

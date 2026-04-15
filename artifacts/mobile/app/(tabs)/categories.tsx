@@ -66,32 +66,47 @@ export default function CategoriesScreen() {
         ]}
         ListHeaderComponent={
           <>
-            <View style={styles.headerRow}>
-              <View>
-                <Text style={[styles.title, { color: colors.foreground }]}>Collections</Text>
-                <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  {categories.length} {categories.length === 1 ? "category" : "categories"}
-                </Text>
+            <View style={styles.headerGlow}>
+              <LinearGradient
+                colors={["#784BEA14", "#6466EF08", "transparent"]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+              <View style={styles.headerRow}>
+                <View>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.titleMain}>Collections</Text>
+                  </View>
+                  <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+                    {categories.length} {categories.length === 1 ? "category" : "categories"}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowAdd(!showAdd);
+                  }}
+                  style={[
+                    styles.addBtn,
+                    showAdd
+                      ? { backgroundColor: "#784BEA25", borderColor: "#784BEA55" }
+                      : { backgroundColor: colors.secondary, borderColor: colors.border },
+                  ]}
+                >
+                  <Feather name={showAdd ? "x" : "plus"} size={19} color={showAdd ? "#A56BF7" : colors.mutedForeground} />
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowAdd(!showAdd);
-                }}
-                style={[
-                  styles.addBtn,
-                  {
-                    backgroundColor: showAdd ? "#784BEA22" : colors.secondary,
-                    borderColor: showAdd ? "#784BEA55" : colors.border,
-                  },
-                ]}
-              >
-                <Feather name={showAdd ? "x" : "plus"} size={18} color={showAdd ? "#A56BF7" : colors.mutedForeground} />
-              </Pressable>
             </View>
 
             {showAdd && (
-              <View style={[styles.addForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.addForm, { backgroundColor: colors.card, borderColor: "#784BEA28" }]}>
+                <LinearGradient
+                  colors={["#784BEA10", "transparent"]}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
                 <TextInput
                   value={newName}
                   onChangeText={setNewName}
@@ -100,32 +115,32 @@ export default function CategoriesScreen() {
                   style={[styles.input, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
                   autoFocus
                 />
-                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>Color</Text>
+                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>COLOR</Text>
                 <View style={styles.optionsRow}>
                   {CATEGORY_COLORS.map((c, i) => (
                     <Pressable
                       key={c}
                       onPress={() => setSelectedColor(i)}
                       style={[
-                        styles.colorOption,
+                        styles.colorSwatch,
                         { backgroundColor: c },
-                        selectedColor === i && styles.colorOptionSelected,
+                        selectedColor === i && { borderWidth: 2.5, borderColor: "#fff" },
                       ]}
                     >
                       {selectedColor === i && (
-                        <Feather name="check" size={12} color="#fff" />
+                        <Feather name="check" size={11} color="#fff" />
                       )}
                     </Pressable>
                   ))}
                 </View>
-                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>Icon</Text>
+                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>ICON</Text>
                 <View style={styles.optionsRow}>
                   {CATEGORY_ICONS.map((icon, i) => (
                     <Pressable
                       key={icon}
                       onPress={() => setSelectedIcon(i)}
                       style={[
-                        styles.iconOption,
+                        styles.iconSwatch,
                         {
                           backgroundColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "22" : colors.secondary,
                           borderColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "70" : colors.border,
@@ -145,7 +160,7 @@ export default function CategoriesScreen() {
                     colors={["#6466EF", "#784BEA", "#A56BF7"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={styles.saveBtnGradient}
+                    style={styles.saveBtn}
                   >
                     <Feather name="plus" size={16} color="#fff" />
                     <Text style={styles.saveBtnText}>Create Collection</Text>
@@ -168,9 +183,12 @@ export default function CategoriesScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <View style={[styles.emptyIconRing, { backgroundColor: "#784BEA12", borderColor: "#784BEA28" }]}>
-              <Feather name="folder" size={36} color="#A56BF7" style={{ opacity: 0.7 }} />
-            </View>
+            <LinearGradient
+              colors={["#784BEA20", "#6466EF10"]}
+              style={styles.emptyIconRing}
+            >
+              <Feather name="folder" size={36} color="#A56BF7" style={{ opacity: 0.8 }} />
+            </LinearGradient>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No collections yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
               Tap + to create your first collection
@@ -184,17 +202,26 @@ export default function CategoriesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { paddingHorizontal: 16, gap: 0 },
+  content: { paddingHorizontal: 16 },
+  headerGlow: {
+    overflow: "hidden",
+    marginBottom: 20,
+    paddingBottom: 4,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
   },
-  title: {
-    fontSize: 26,
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  titleMain: {
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -0.8,
+    letterSpacing: -1,
+    color: "#F0F1FF",
   },
   subtitle: {
     fontSize: 12,
@@ -202,9 +229,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -212,9 +239,10 @@ const styles = StyleSheet.create({
   addForm: {
     padding: 16,
     borderRadius: 18,
-    gap: 10,
     marginBottom: 16,
     borderWidth: 1,
+    gap: 10,
+    overflow: "hidden",
   },
   input: {
     paddingHorizontal: 14,
@@ -225,9 +253,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   formLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.6,
+    letterSpacing: 0.9,
     marginTop: 2,
   },
   optionsRow: {
@@ -235,26 +263,22 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: "wrap",
   },
-  colorOption: {
+  colorSwatch: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  colorOptionSelected: {
-    borderWidth: 2.5,
-    borderColor: "#fff",
-  },
-  iconOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  iconSwatch: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
-  saveBtnGradient: {
+  saveBtn: {
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -268,11 +292,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     marginBottom: 12,
-    marginTop: 4,
   },
   emptyState: {
     alignItems: "center",
@@ -280,16 +303,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyIconRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1.5,
     marginBottom: 4,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: "Inter_600SemiBold",
   },
   emptyText: {

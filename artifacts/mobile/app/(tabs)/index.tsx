@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -59,19 +60,32 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
         ListHeaderComponent={
-          <View style={{ paddingTop: topPadding + 8 }}>
-            <View style={styles.header}>
-              <View>
-                <Text style={[styles.appName, { color: colors.foreground }]}>Vexo Save</Text>
-                <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  {items.length} {items.length === 1 ? "video" : "videos"} saved
-                </Text>
-              </View>
-              <VexoLogo size={44} />
-            </View>
+          <View>
+            <View style={[styles.headerGlow, { paddingTop: topPadding + 12 }]}>
+              <LinearGradient
+                colors={["#784BEA18", "#6466EF0A", "transparent"]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
 
-            <View style={styles.searchWrap}>
-              <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+              <View style={styles.headerRow}>
+                <View>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.titleVexo}>Vexo</Text>
+                    <Text style={styles.titleSave}> Save</Text>
+                  </View>
+                  <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+                    {items.length} {items.length === 1 ? "video" : "videos"} in your library
+                  </Text>
+                </View>
+                <VexoLogo size={46} />
+              </View>
+
+              <View style={styles.searchWrap}>
+                <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+              </View>
             </View>
 
             <ScrollView
@@ -84,7 +98,7 @@ export default function HomeScreen() {
                 <View
                   key={name}
                   style={{
-                    marginLeft: idx === 0 ? 16 : 7,
+                    marginLeft: idx === 0 ? 16 : 8,
                     marginRight: idx === categoryList.length - 1 ? 16 : 0,
                   }}
                 >
@@ -151,19 +165,29 @@ export default function HomeScreen() {
 function GlobalEmptyState({ colors, onAdd }: { colors: any; onAdd: () => void }) {
   return (
     <View style={emptyStyles.container}>
-      <View style={[emptyStyles.iconRing, { backgroundColor: "#784BEA18", borderColor: "#784BEA30" }]}>
-        <Feather name="bookmark" size={36} color="#A56BF7" style={{ opacity: 0.8 }} />
-      </View>
-      <Text style={[emptyStyles.title, { color: colors.foreground }]}>No saved videos yet</Text>
+      <LinearGradient
+        colors={["#784BEA20", "#6466EF10"]}
+        style={emptyStyles.iconRing}
+      >
+        <Feather name="bookmark" size={38} color="#A56BF7" style={{ opacity: 0.85 }} />
+      </LinearGradient>
+      <Text style={[emptyStyles.title, { color: colors.foreground }]}>Your library is empty</Text>
       <Text style={[emptyStyles.desc, { color: colors.mutedForeground }]}>
-        Start building your collection.{"\n"}Paste a YouTube, TikTok, or Instagram link.
+        Save your first video from YouTube,{"\n"}TikTok, or Instagram.
       </Text>
       <Pressable
         onPress={onAdd}
         style={({ pressed }) => [emptyStyles.cta, { opacity: pressed ? 0.82 : 1 }]}
       >
-        <Feather name="plus" size={16} color="#fff" />
-        <Text style={emptyStyles.ctaText}>Save your first video</Text>
+        <LinearGradient
+          colors={["#6466EF", "#784BEA", "#A56BF7"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={emptyStyles.ctaGrad}
+        >
+          <Feather name="plus" size={16} color="#fff" />
+          <Text style={emptyStyles.ctaText}>Save your first video</Text>
+        </LinearGradient>
       </Pressable>
     </View>
   );
@@ -182,38 +206,45 @@ function FilteredEmptyState({
 
   return (
     <View style={emptyStyles.container}>
-      <View style={[emptyStyles.iconRing, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+      <View style={[emptyStyles.iconRing, { backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border }]}>
         <Feather
           name={isSearch ? "search" : "folder"}
-          size={32}
+          size={34}
           color={colors.mutedForeground}
-          style={{ opacity: 0.55 }}
+          style={{ opacity: 0.5 }}
         />
       </View>
       <Text style={[emptyStyles.title, { color: colors.foreground }]}>
-        {isSearch ? "No results found" : `No ${selectedCategory} videos`}
+        {isSearch ? "No results" : `No ${selectedCategory} videos`}
       </Text>
       <Text style={[emptyStyles.desc, { color: colors.mutedForeground }]}>
         {isSearch
           ? `Nothing matched "${searchQuery}".`
-          : `You haven't saved any ${selectedCategory} videos yet.`}
+          : `No ${selectedCategory} videos saved yet.`}
       </Text>
       <View style={emptyStyles.row}>
         <Pressable
           onPress={onClear}
           style={({ pressed }) => [
-            emptyStyles.secondaryCta,
+            emptyStyles.secondary,
             { backgroundColor: colors.secondary, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
           ]}
         >
-          <Text style={[emptyStyles.secondaryCtaText, { color: colors.mutedForeground }]}>Clear filter</Text>
+          <Text style={[emptyStyles.secondaryText, { color: colors.mutedForeground }]}>Clear</Text>
         </Pressable>
         <Pressable
           onPress={onAdd}
           style={({ pressed }) => [emptyStyles.cta, { flex: 1, opacity: pressed ? 0.82 : 1 }]}
         >
-          <Feather name="plus" size={15} color="#fff" />
-          <Text style={emptyStyles.ctaText}>Add video</Text>
+          <LinearGradient
+            colors={["#6466EF", "#784BEA", "#A56BF7"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={emptyStyles.ctaGrad}
+          >
+            <Feather name="plus" size={15} color="#fff" />
+            <Text style={emptyStyles.ctaText}>Add video</Text>
+          </LinearGradient>
         </Pressable>
       </View>
     </View>
@@ -223,23 +254,22 @@ function FilteredEmptyState({
 const emptyStyles = StyleSheet.create({
   container: {
     alignItems: "center",
-    paddingTop: 56,
+    paddingTop: 60,
     paddingHorizontal: 28,
-    gap: 12,
+    gap: 13,
   },
   iconRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1.5,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   title: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.3,
+    fontSize: 19,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.4,
     textAlign: "center",
   },
   desc: {
@@ -255,34 +285,31 @@ const emptyStyles = StyleSheet.create({
     alignSelf: "stretch",
   },
   cta: {
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  ctaGrad: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 14,
+    paddingVertical: 13,
     gap: 7,
-    backgroundColor: "#784BEA",
-    shadowColor: "#784BEA",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
   },
   ctaText: {
     color: "#fff",
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
-  secondaryCta: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  secondary: {
+    paddingHorizontal: 18,
+    paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryCtaText: {
+  secondaryText: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
@@ -290,30 +317,57 @@ const emptyStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
+  headerGlow: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    overflow: "hidden",
+  },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  appName: {
-    fontSize: 26,
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  titleVexo: {
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -0.8,
+    letterSpacing: -1,
+    color: "#F0F1FF",
+  },
+  titleSave: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -1,
+    color: "#A56BF7",
   },
   subtitle: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    marginTop: 1,
+    marginTop: 2,
   },
   searchWrap: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 0,
   },
-  chipsScroll: { marginBottom: 14 },
-  chipsRow: { flexDirection: "row", alignItems: "center" },
-  gridWrap: { paddingHorizontal: 16 },
-  grid: { flexDirection: "row", gap: 10 },
-  column: { flex: 1 },
+  chipsScroll: {
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  gridWrap: {
+    paddingHorizontal: 16,
+  },
+  grid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  column: {
+    flex: 1,
+  },
 });

@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 interface FloatingAddButtonProps {
@@ -11,12 +11,22 @@ interface FloatingAddButtonProps {
 
 export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.3, duration: 1600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 1600, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scale, { toValue: 0.86, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 12 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 14 }).start();
   }
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -24,57 +34,58 @@ export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddBu
   }
 
   return (
-    <Animated.View style={[styles.container, { bottom: bottomOffset, transform: [{ scale }] }]}>
-      <View style={styles.glow} />
-      <Pressable
-        onPress={handlePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-      >
-        <LinearGradient
-          colors={["#6466EF", "#784BEA", "#A56BF7"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
+    <View style={[styles.anchor, { bottom: bottomOffset }]}>
+      <Animated.View
+        style={[
+          styles.pulseRing,
+          { transform: [{ scale: pulse }] },
+        ]}
+      />
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={handlePress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
         >
-          <Feather name="plus" size={26} color="#fff" />
-        </LinearGradient>
-      </Pressable>
-    </Animated.View>
+          <LinearGradient
+            colors={["#6466EF", "#784BEA", "#A56BF7"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.btn}
+          >
+            <Feather name="plus" size={26} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  anchor: {
     position: "absolute",
     right: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  glow: {
+  pulseRing: {
     position: "absolute",
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: "#784BEA",
-    opacity: 0.35,
-    transform: [{ scale: 1.2 }],
-    shadowColor: "#784BEA",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 0,
+    opacity: 0.22,
   },
-  gradient: {
+  btn: {
     width: 58,
     height: 58,
     borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#6466EF",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.7,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.8,
+    shadowRadius: 22,
+    elevation: 16,
   },
 });

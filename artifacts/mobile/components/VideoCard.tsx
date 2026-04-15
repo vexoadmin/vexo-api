@@ -4,7 +4,6 @@ import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { useColors } from "@/hooks/useColors";
 import { SavedItem } from "@/contexts/SavedItemsContext";
 
 const PLATFORM_ICONS: Record<string, string> = {
@@ -12,10 +11,9 @@ const PLATFORM_ICONS: Record<string, string> = {
   tiktok: "music",
   instagram: "instagram",
 };
-
 const PLATFORM_COLORS: Record<string, string> = {
   youtube: "#FF4040",
-  tiktok: "#E0E0FF",
+  tiktok: "#C0C8FF",
   instagram: "#F06292",
 };
 
@@ -26,15 +24,15 @@ interface VideoCardProps {
 }
 
 export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
-  const colors = useColors();
   const scale = useRef(new Animated.Value(1)).current;
-  const height = isLarge ? 196 : 148;
+  const height = isLarge ? 210 : 152;
+  const glow = item.thumbnailColor;
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40, bounciness: 2 }).start();
+    Animated.spring(scale, { toValue: 0.955, useNativeDriver: true, speed: 40, bounciness: 2 }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 10 }).start();
   }
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -42,78 +40,84 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   }
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ scale }] }]}>
+    <Animated.View style={[styles.wrapper, { transform: [{ scale }], shadowColor: glow }]}>
       <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[styles.card, { borderColor: glow + "38" }]}
       >
         <LinearGradient
-          colors={[item.thumbnailColor + "F0", item.thumbnailColor + "A0", item.thumbnailColor + "50"]}
+          colors={[glow + "FF", glow + "CC", glow + "66"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.thumbnail, { height }]}
         >
+          <LinearGradient
+            colors={["rgba(255,255,255,0.12)", "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0.6 }}
+            style={StyleSheet.absoluteFill}
+          />
+
           <View style={styles.topRow}>
-            <View style={[styles.platformBadge, { backgroundColor: "rgba(0,0,0,0.45)", borderColor: "rgba(255,255,255,0.08)" }]}>
-              <Feather
-                name={PLATFORM_ICONS[item.platform] as any}
-                size={10}
-                color={PLATFORM_COLORS[item.platform]}
-              />
+            <View style={[styles.platformBadge, { backgroundColor: "rgba(0,0,0,0.5)", borderColor: PLATFORM_COLORS[item.platform] + "40" }]}>
+              <Feather name={PLATFORM_ICONS[item.platform] as any} size={10} color={PLATFORM_COLORS[item.platform]} />
             </View>
             {item.reminder && item.reminder > Date.now() && (
-              <View style={styles.reminderDot}>
-                <View style={styles.reminderDotInner} />
+              <View style={styles.reminderPip}>
+                <View style={styles.reminderPipCore} />
               </View>
             )}
           </View>
-          <View style={styles.playWrap}>
-            <View style={styles.playRing}>
-              <View style={styles.playButton}>
-                <Feather name="play" size={14} color="#fff" style={{ marginLeft: 2 }} />
+
+          <View style={styles.playCenter}>
+            <LinearGradient
+              colors={["rgba(255,255,255,0.30)", "rgba(255,255,255,0.10)"]}
+              style={styles.playOuter}
+            >
+              <View style={styles.playInner}>
+                <Feather name="play" size={13} color="#fff" style={{ marginLeft: 2 }} />
               </View>
-            </View>
+            </LinearGradient>
           </View>
         </LinearGradient>
 
-        <View style={styles.info}>
-          <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
-            {item.title}
-          </Text>
+        <LinearGradient
+          colors={[glow + "18", "#0D1025"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.info}
+        >
+          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
           {item.notes ? (
-            <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={1}>
-              {item.notes}
-            </Text>
+            <Text style={styles.notes} numberOfLines={1}>{item.notes}</Text>
           ) : null}
           <View style={styles.footer}>
-            <View style={[styles.categoryPill, { backgroundColor: item.thumbnailColor + "1C" }]}>
-              <View style={[styles.dot, { backgroundColor: item.thumbnailColor }]} />
-              <Text style={[styles.categoryText, { color: item.thumbnailColor }]}>
-                {item.category}
-              </Text>
+            <View style={[styles.catPill, { backgroundColor: glow + "22", borderColor: glow + "50" }]}>
+              <View style={[styles.catDot, { backgroundColor: glow }]} />
+              <Text style={[styles.catText, { color: glow }]}>{item.category}</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
       </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    elevation: 14,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
+    backgroundColor: "#0D1025",
   },
   thumbnail: {
     justifyContent: "space-between",
@@ -132,38 +136,37 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  reminderDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+  reminderPip: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(245,158,11,0.18)",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(245,158,11,0.15)",
   },
-  reminderDotInner: {
+  reminderPipCore: {
     width: 7,
     height: 7,
     borderRadius: 4,
     backgroundColor: "#F59E0B",
   },
-  playWrap: {
+  playCenter: {
     alignItems: "center",
     justifyContent: "center",
     flex: 1,
   },
-  playRing: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.12)",
+  playOuter: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
   },
-  playButton: {
+  playInner: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.25)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -178,32 +181,35 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     lineHeight: 18,
     letterSpacing: -0.1,
+    color: "#F0F1FF",
   },
   notes: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     lineHeight: 15,
+    color: "#6B7A9E",
   },
   footer: {
     flexDirection: "row",
-    marginTop: 6,
+    marginTop: 7,
   },
-  categoryPill: {
+  catPill: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 7,
     gap: 5,
+    borderWidth: 1,
   },
-  dot: {
+  catDot: {
     width: 5,
     height: 5,
     borderRadius: 3,
   },
-  categoryText: {
+  catText: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 });
