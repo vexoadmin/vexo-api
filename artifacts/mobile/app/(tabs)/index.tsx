@@ -1,10 +1,11 @@
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  Animated,
   FlatList,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -47,6 +48,9 @@ export default function HomeScreen() {
     [categories]
   );
 
+  const isEmpty = displayedItems.length === 0;
+  const isGlobalEmpty = items.length === 0;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
@@ -60,7 +64,7 @@ export default function HomeScreen() {
               <View>
                 <Text style={[styles.appName, { color: colors.foreground }]}>Vexo Save</Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  {items.length} videos saved
+                  {items.length} {items.length === 1 ? "video" : "videos"} saved
                 </Text>
               </View>
               <LinearGradient
@@ -80,33 +84,39 @@ export default function HomeScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsRow}
               style={styles.chipsScroll}
+              contentContainerStyle={styles.chipsRow}
             >
-              {categoryList.map((name) => (
-                <CategoryChip
+              {categoryList.map((name, idx) => (
+                <View
                   key={name}
-                  label={name}
-                  color={name === "All" ? colors.primary : categoryColorMap[name]}
-                  selected={selectedCategory === name}
-                  onPress={() => setSelectedCategory(name)}
-                />
+                  style={{ marginLeft: idx === 0 ? 16 : 7, marginRight: idx === categoryList.length - 1 ? 16 : 0 }}
+                >
+                  <CategoryChip
+                    label={name}
+                    color={name === "All" ? "#9B72F7" : categoryColorMap[name]}
+                    selected={selectedCategory === name}
+                    onPress={() => setSelectedCategory(name)}
+                  />
+                </View>
               ))}
             </ScrollView>
           </View>
         }
         renderItem={() => (
           <View style={styles.gridWrap}>
-            {displayedItems.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyIcon, { color: colors.mutedForeground }]}>—</Text>
-                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                  {searchQuery ? "No results" : `No ${selectedCategory === "All" ? "saved videos" : selectedCategory + " videos"} yet`}
-                </Text>
-                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                  {searchQuery ? "Try a different search term" : "Tap + to save your first video"}
-                </Text>
-              </View>
+            {isEmpty ? (
+              isGlobalEmpty ? (
+                <GlobalEmptyState colors={colors} onAdd={() => router.push("/add")} />
+              ) : (
+                <FilteredEmptyState
+                  colors={colors}
+                  selectedCategory={selectedCategory}
+                  searchQuery={searchQuery}
+                  onAdd={() => router.push("/add")}
+                  onClear={() => { setSelectedCategory("All"); setSearchQuery(""); }}
+                />
+              )
             ) : (
               <View style={styles.grid}>
                 <View style={styles.column}>
@@ -141,6 +151,152 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+function GlobalEmptyState({ colors, onAdd }: { colors: any; onAdd: () => void }) {
+  return (
+    <View style={emptyStyles.container}>
+      <View style={[emptyStyles.iconRing, { backgroundColor: "#8B5CF6" + "12", borderColor: "#8B5CF6" + "28" }]}>
+        <Feather name="bookmark" size={38} color="#8B5CF6" style={{ opacity: 0.7 }} />
+      </View>
+      <Text style={[emptyStyles.title, { color: colors.foreground }]}>
+        No saved videos yet
+      </Text>
+      <Text style={[emptyStyles.desc, { color: colors.mutedForeground }]}>
+        Start building your collection.{"\n"}Paste a YouTube, TikTok, or Instagram link to save it.
+      </Text>
+      <Pressable
+        onPress={onAdd}
+        style={({ pressed }) => [
+          emptyStyles.cta,
+          { backgroundColor: "#8B5CF6", opacity: pressed ? 0.85 : 1 },
+        ]}
+      >
+        <Feather name="plus" size={16} color="#fff" />
+        <Text style={emptyStyles.ctaText}>Save your first video</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function FilteredEmptyState({
+  colors,
+  selectedCategory,
+  searchQuery,
+  onAdd,
+  onClear,
+}: {
+  colors: any;
+  selectedCategory: string;
+  searchQuery: string;
+  onAdd: () => void;
+  onClear: () => void;
+}) {
+  const isSearch = !!searchQuery.trim();
+
+  return (
+    <View style={emptyStyles.container}>
+      <View style={[emptyStyles.iconRing, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+        <Feather
+          name={isSearch ? "search" : "folder"}
+          size={34}
+          color={colors.mutedForeground}
+          style={{ opacity: 0.6 }}
+        />
+      </View>
+      <Text style={[emptyStyles.title, { color: colors.foreground }]}>
+        {isSearch ? "No results found" : `No ${selectedCategory} videos`}
+      </Text>
+      <Text style={[emptyStyles.desc, { color: colors.mutedForeground }]}>
+        {isSearch
+          ? `Nothing matched "${searchQuery}". Try a different keyword.`
+          : `You haven't saved any ${selectedCategory} videos yet.`}
+      </Text>
+      <View style={emptyStyles.row}>
+        <Pressable
+          onPress={onClear}
+          style={({ pressed }) => [
+            emptyStyles.secondaryCta,
+            { backgroundColor: colors.secondary, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
+          ]}
+        >
+          <Text style={[emptyStyles.secondaryCtaText, { color: colors.mutedForeground }]}>Clear filter</Text>
+        </Pressable>
+        <Pressable
+          onPress={onAdd}
+          style={({ pressed }) => [
+            emptyStyles.cta,
+            { backgroundColor: "#8B5CF6", opacity: pressed ? 0.85 : 1, flex: 1 },
+          ]}
+        >
+          <Feather name="plus" size={15} color="#fff" />
+          <Text style={emptyStyles.ctaText}>Add video</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const emptyStyles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    paddingTop: 56,
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iconRing: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    marginBottom: 6,
+  },
+  title: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  desc: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  row: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+    alignSelf: "stretch",
+  },
+  cta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+    gap: 7,
+  },
+  ctaText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  secondaryCta: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryCtaText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -184,9 +340,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   chipsRow: {
-    paddingHorizontal: 16,
-    gap: 7,
     flexDirection: "row",
+    alignItems: "center",
   },
   gridWrap: {
     paddingHorizontal: 16,
@@ -197,23 +352,5 @@ const styles = StyleSheet.create({
   },
   column: {
     flex: 1,
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingTop: 70,
-    gap: 8,
-  },
-  emptyIcon: {
-    fontSize: 32,
-    fontFamily: "Inter_700Bold",
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-  },
-  emptyText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    textAlign: "center",
   },
 });

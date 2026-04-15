@@ -30,8 +30,9 @@ function RootLayoutNav() {
         headerBackTitle: "Back",
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
         contentStyle: { backgroundColor: colors.background },
+        headerShadowVisible: false,
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -50,9 +51,9 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="category/[id]"
-        options={({ route }: any) => ({
+        options={{
           title: "Category",
-        })}
+        }}
       />
     </Stack>
   );

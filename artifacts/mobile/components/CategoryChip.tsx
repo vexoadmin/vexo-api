@@ -1,6 +1,7 @@
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -17,7 +18,7 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
   const chipColor = color || colors.primary;
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.93, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   }
   function handlePressOut() {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 8 }).start();
@@ -33,6 +34,7 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
+        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         style={[
           styles.chip,
           selected
@@ -40,6 +42,9 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
             : { backgroundColor: colors.secondary, borderColor: colors.border },
         ]}
       >
+        {selected && (
+          <View style={styles.checkDot} />
+        )}
         <Text
           style={[
             styles.label,
@@ -55,10 +60,19 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
 
 const styles = StyleSheet.create({
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
+    gap: 5,
+  },
+  checkDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.7)",
   },
   label: {
     fontSize: 13,
