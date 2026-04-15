@@ -21,7 +21,6 @@ import { useSavedItems } from "@/contexts/SavedItemsContext";
 const BG = "#0B0B12";
 const SURFACE = "#11131F";
 const BORDER = "#1A1B2E";
-const MUTED = "#9CA3AF";
 
 const ACCENT_COLORS = [
   "#7C5CFF", "#4CC9F0", "#A78BFA", "#F472B6",
@@ -51,15 +50,22 @@ const PLATFORM_NAMES: Record<string, string> = {
   tiktok: "TikTok",
   instagram: "Instagram",
 };
+const PLATFORM_DESC: Record<string, string> = {
+  youtube: "YouTube video detected",
+  tiktok: "TikTok video detected",
+  instagram: "Instagram reel detected",
+};
 
 const REMINDER_OPTIONS = [
   { label: "Tomorrow",  icon: "sun" as const,      getValue: () => Date.now() + 86400000 },
-  { label: "Weekend",   icon: "coffee" as const,    getValue: () => {
-    const now = new Date(); const day = now.getDay();
-    const daysUntilSat = (6 - day + 7) % 7 || 7;
-    return Date.now() + daysUntilSat * 86400000;
-  }},
-  { label: "Next Week", icon: "calendar" as const,  getValue: () => Date.now() + 7 * 86400000 },
+  {
+    label: "Weekend", icon: "coffee" as const, getValue: () => {
+      const now = new Date(); const day = now.getDay();
+      const daysUntilSat = (6 - day + 7) % 7 || 7;
+      return Date.now() + daysUntilSat * 86400000;
+    }
+  },
+  { label: "Next week", icon: "calendar" as const,  getValue: () => Date.now() + 7 * 86400000 },
 ];
 
 export default function AddScreen() {
@@ -74,6 +80,7 @@ export default function AddScreen() {
   const [showCustomDate, setShowCustomDate] = useState(false);
 
   const detectedPlatform = detectPlatform(url);
+  const platformColor = detectedPlatform ? PLATFORM_COLORS[detectedPlatform] : null;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 16;
 
   function handleSave() {
@@ -106,14 +113,14 @@ export default function AddScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Video Link ── */}
-        <View style={styles.field}>
+        {/* ── 1. Video Link ── */}
+        <View style={styles.section}>
           <Text style={styles.label}>VIDEO LINK</Text>
           <View style={[styles.inputRow, detectedPlatform && styles.inputRowActive]}>
             <Feather
               name="link-2"
               size={15}
-              color={detectedPlatform ? "#7C5CFF" : "#4A5170"}
+              color={platformColor || "#4A5170"}
             />
             <TextInput
               value={url}
@@ -125,27 +132,51 @@ export default function AddScreen() {
               keyboardType="url"
             />
           </View>
-          {detectedPlatform && (
-            <View
-              style={[
-                styles.detected,
-                { backgroundColor: PLATFORM_COLORS[detectedPlatform] + "12", borderColor: PLATFORM_COLORS[detectedPlatform] + "28" },
-              ]}
-            >
-              <Feather
-                name={PLATFORM_ICONS[detectedPlatform] as any}
-                size={11}
-                color={PLATFORM_COLORS[detectedPlatform]}
+        </View>
+
+        {/* ── 2. Preview Card ── */}
+        <View style={styles.previewCard}>
+          {detectedPlatform ? (
+            <>
+              <LinearGradient
+                colors={[platformColor! + "22", platformColor! + "08", "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
               />
-              <Text style={[styles.detectedText, { color: PLATFORM_COLORS[detectedPlatform] }]}>
-                {PLATFORM_NAMES[detectedPlatform]} detected
-              </Text>
+              <View style={styles.previewTop}>
+                <View style={[styles.previewPlatformBadge, { backgroundColor: platformColor! + "18", borderColor: platformColor! + "30" }]}>
+                  <Feather name={PLATFORM_ICONS[detectedPlatform] as any} size={12} color={platformColor!} />
+                  <Text style={[styles.previewPlatformText, { color: platformColor! }]}>
+                    {PLATFORM_NAMES[detectedPlatform]}
+                  </Text>
+                </View>
+                <View style={styles.previewConfirmed}>
+                  <Feather name="check-circle" size={12} color="#34D399" />
+                  <Text style={styles.previewConfirmedText}>Link confirmed</Text>
+                </View>
+              </View>
+              <View style={styles.previewPlayArea}>
+                <View style={[styles.previewPlayBtn, { borderColor: platformColor! + "40" }]}>
+                  <Feather name="play" size={20} color={platformColor!} style={{ marginLeft: 2 }} />
+                </View>
+              </View>
+              <Text style={styles.previewDesc}>{PLATFORM_DESC[detectedPlatform]}</Text>
+              {url.length > 0 && (
+                <Text style={styles.previewUrl} numberOfLines={1}>{url}</Text>
+              )}
+            </>
+          ) : (
+            <View style={styles.previewEmpty}>
+              <Feather name="video" size={28} color="#2A2E45" />
+              <Text style={styles.previewEmptyText}>Video preview</Text>
+              <Text style={styles.previewEmptySub}>Paste a link above to see a preview</Text>
             </View>
           )}
         </View>
 
-        {/* ── Title ── */}
-        <View style={styles.field}>
+        {/* ── 3. Title ── */}
+        <View style={styles.section}>
           <Text style={styles.label}>TITLE</Text>
           <TextInput
             value={title}
@@ -156,8 +187,8 @@ export default function AddScreen() {
           />
         </View>
 
-        {/* ── Category ── */}
-        <View style={styles.field}>
+        {/* ── 4. Category ── */}
+        <View style={styles.section}>
           <Text style={styles.label}>CATEGORY</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
             <View style={styles.chipRow}>
@@ -187,8 +218,8 @@ export default function AddScreen() {
           </ScrollView>
         </View>
 
-        {/* ── Notes ── */}
-        <View style={styles.field}>
+        {/* ── 5. Notes ── */}
+        <View style={styles.section}>
           <Text style={styles.label}>NOTES</Text>
           <TextInput
             value={notes}
@@ -202,8 +233,8 @@ export default function AddScreen() {
           />
         </View>
 
-        {/* ── Reminder ── */}
-        <View style={styles.field}>
+        {/* ── 6. Reminder ── */}
+        <View style={styles.section}>
           <Text style={styles.label}>REMINDER</Text>
           <View style={styles.chipRow}>
             {REMINDER_OPTIONS.map((opt) => {
@@ -217,10 +248,7 @@ export default function AddScreen() {
                     setReminder(active ? undefined : val);
                     setShowCustomDate(false);
                   }}
-                  style={[
-                    styles.reminderChip,
-                    active && styles.reminderChipActive,
-                  ]}
+                  style={[styles.reminderChip, active && styles.reminderChipActive]}
                 >
                   <Feather name={opt.icon} size={12} color={active ? "#7C5CFF" : "#4A5170"} />
                   <Text style={[styles.reminderChipText, active && { color: "#7C5CFF" }]}>
@@ -234,10 +262,7 @@ export default function AddScreen() {
                 Haptics.selectionAsync();
                 setShowCustomDate(!showCustomDate);
               }}
-              style={[
-                styles.reminderChip,
-                showCustomDate && styles.reminderChipActive,
-              ]}
+              style={[styles.reminderChip, showCustomDate && styles.reminderChipActive]}
             >
               <Feather name="calendar" size={12} color={showCustomDate ? "#7C5CFF" : "#4A5170"} />
               <Text style={[styles.reminderChipText, showCustomDate && { color: "#7C5CFF" }]}>
@@ -250,7 +275,7 @@ export default function AddScreen() {
             <View style={styles.reminderSet}>
               <Feather name="bell" size={12} color="#7C5CFF" />
               <Text style={styles.reminderSetText}>
-                Reminder: {formatReminder(reminder)}
+                Reminder set: {formatReminder(reminder)}
               </Text>
               <Pressable onPress={() => setReminder(undefined)} hitSlop={8}>
                 <Feather name="x" size={12} color="#4A5170" />
@@ -271,7 +296,7 @@ export default function AddScreen() {
           )}
         </View>
 
-        {/* ── Save button ── */}
+        {/* ── 7. Save button ── */}
         <Pressable
           onPress={handleSave}
           style={({ pressed }) => [styles.saveWrap, { opacity: pressed ? 0.85 : 1 }]}
@@ -283,7 +308,7 @@ export default function AddScreen() {
             style={styles.saveBtn}
           >
             <Feather name="bookmark" size={17} color="#fff" />
-            <Text style={styles.saveBtnText}>Save Video</Text>
+            <Text style={styles.saveBtnText}>Save to Library</Text>
           </LinearGradient>
         </Pressable>
       </ScrollView>
@@ -292,19 +317,14 @@ export default function AddScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-  },
+  container: { flex: 1, backgroundColor: BG },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    gap: 24,
+    paddingTop: 20,
+    gap: 22,
   },
 
-  field: {
-    gap: 10,
-  },
+  section: { gap: 10 },
   label: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
@@ -323,9 +343,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 10,
   },
-  inputRowActive: {
-    borderColor: "#7C5CFF40",
-  },
+  inputRowActive: { borderColor: "#7C5CFF40" },
   inputText: {
     flex: 1,
     fontSize: 15,
@@ -356,28 +374,93 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: "#FFFFFF",
-    minHeight: 96,
+    minHeight: 90,
     textAlignVertical: "top",
   },
 
-  detected: {
+  previewCard: {
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    minHeight: 150,
+    overflow: "hidden",
+    padding: 16,
+    gap: 10,
+  },
+  previewTop: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
+    justifyContent: "space-between",
+  },
+  previewPlatformBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
-    gap: 6,
+    borderRadius: 9,
     borderWidth: 1,
+    gap: 5,
   },
-  detectedText: {
+  previewPlatformText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
-
-  chipScroll: {
-    marginHorizontal: -20,
+  previewConfirmed: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
+  previewConfirmedText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: "#34D399",
+  },
+  previewPlayArea: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+  },
+  previewPlayBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewDesc: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
+  previewUrl: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: "#4A5170",
+    textAlign: "center",
+  },
+  previewEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 24,
+  },
+  previewEmptyText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#2A2E45",
+  },
+  previewEmptySub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#1E2135",
+    textAlign: "center",
+  },
+
+  chipScroll: { marginHorizontal: -20 },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -421,7 +504,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: "#4A5170",
   },
-
   reminderSet: {
     flexDirection: "row",
     alignItems: "center",
