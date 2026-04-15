@@ -20,8 +20,8 @@ import { useSavedItems } from "@/contexts/SavedItemsContext";
 import { useColors } from "@/hooks/useColors";
 
 const GRADIENT_COLORS = [
-  "#8B5CF6", "#6366F1", "#3B82F6", "#06B6D4",
-  "#F97316", "#EC4899", "#10B981", "#F59E0B",
+  "#784BEA", "#6466EF", "#A56BF7", "#FA7DBA",
+  "#2C6FD8", "#10B981", "#F59E0B", "#D15780",
 ];
 
 function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null {
@@ -33,14 +33,16 @@ function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null 
 }
 
 const REMINDER_OPTIONS = [
-  { label: "Tomorrow", getValue: () => Date.now() + 86400000 },
-  { label: "Weekend", getValue: () => {
-    const now = new Date();
-    const day = now.getDay();
-    const daysUntilSat = (6 - day + 7) % 7 || 7;
-    return Date.now() + daysUntilSat * 86400000;
-  }},
-  { label: "Next Week", getValue: () => Date.now() + 7 * 86400000 },
+  { label: "Tomorrow", icon: "sun" as const, getValue: () => Date.now() + 86400000 },
+  {
+    label: "Weekend", icon: "coffee" as const, getValue: () => {
+      const now = new Date();
+      const day = now.getDay();
+      const daysUntilSat = (6 - day + 7) % 7 || 7;
+      return Date.now() + daysUntilSat * 86400000;
+    },
+  },
+  { label: "Next Week", icon: "calendar" as const, getValue: () => Date.now() + 7 * 86400000 },
 ];
 
 export default function AddScreen() {
@@ -79,6 +81,10 @@ export default function AddScreen() {
     return new Date(ts).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
+  const PLATFORM_COLORS: Record<string, string> = { youtube: "#FF4040", tiktok: "#E0E0FF", instagram: "#F06292" };
+  const PLATFORM_ICONS: Record<string, string> = { youtube: "youtube", tiktok: "music", instagram: "instagram" };
+  const PLATFORM_NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -88,8 +94,14 @@ export default function AddScreen() {
       >
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.mutedForeground }]}>VIDEO LINK</Text>
-          <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: detectedPlatform ? "#8B5CF6" + "66" : colors.border }]}>
-            <Feather name="link-2" size={16} color={detectedPlatform ? colors.primary : colors.mutedForeground} />
+          <View style={[
+            styles.inputRow,
+            {
+              backgroundColor: colors.secondary,
+              borderColor: detectedPlatform ? "#784BEA55" : colors.border,
+            },
+          ]}>
+            <Feather name="link-2" size={16} color={detectedPlatform ? "#A56BF7" : colors.mutedForeground} />
             <TextInput
               value={url}
               onChangeText={setUrl}
@@ -101,14 +113,14 @@ export default function AddScreen() {
             />
           </View>
           {detectedPlatform && (
-            <View style={[styles.detected, { backgroundColor: "#8B5CF6" + "15" }]}>
+            <View style={[styles.detected, { backgroundColor: PLATFORM_COLORS[detectedPlatform] + "14", borderColor: PLATFORM_COLORS[detectedPlatform] + "30" }]}>
               <Feather
-                name={detectedPlatform === "youtube" ? "youtube" : detectedPlatform === "instagram" ? "instagram" : "music"}
+                name={PLATFORM_ICONS[detectedPlatform] as any}
                 size={12}
-                color={colors.primary}
+                color={PLATFORM_COLORS[detectedPlatform]}
               />
-              <Text style={[styles.detectedText, { color: colors.primary }]}>
-                {detectedPlatform === "youtube" ? "YouTube" : detectedPlatform === "instagram" ? "Instagram" : "TikTok"} detected
+              <Text style={[styles.detectedText, { color: PLATFORM_COLORS[detectedPlatform] }]}>
+                {PLATFORM_NAMES[detectedPlatform]} detected
               </Text>
             </View>
           )}
@@ -141,8 +153,8 @@ export default function AddScreen() {
                     style={[
                       styles.categoryChip,
                       {
-                        backgroundColor: selected ? cat.color + "22" : colors.secondary,
-                        borderColor: selected ? cat.color + "66" : colors.border,
+                        backgroundColor: selected ? cat.color + "20" : colors.secondary,
+                        borderColor: selected ? cat.color + "60" : colors.border,
                       },
                     ]}
                   >
@@ -188,13 +200,13 @@ export default function AddScreen() {
                   style={[
                     styles.reminderChip,
                     {
-                      backgroundColor: active ? colors.primary + "22" : colors.secondary,
-                      borderColor: active ? colors.primary + "55" : colors.border,
+                      backgroundColor: active ? "#784BEA20" : colors.secondary,
+                      borderColor: active ? "#784BEA55" : colors.border,
                     },
                   ]}
                 >
-                  <Feather name="clock" size={13} color={active ? colors.primary : colors.mutedForeground} />
-                  <Text style={[styles.reminderText, { color: active ? colors.primary : colors.mutedForeground }]}>
+                  <Feather name={opt.icon} size={13} color={active ? "#A56BF7" : colors.mutedForeground} />
+                  <Text style={[styles.reminderText, { color: active ? "#A56BF7" : colors.mutedForeground }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -208,19 +220,19 @@ export default function AddScreen() {
               style={[
                 styles.reminderChip,
                 {
-                  backgroundColor: showCustomDate ? colors.accent + "22" : colors.secondary,
-                  borderColor: showCustomDate ? colors.accent + "55" : colors.border,
+                  backgroundColor: showCustomDate ? "#6466EF20" : colors.secondary,
+                  borderColor: showCustomDate ? "#6466EF55" : colors.border,
                 },
               ]}
             >
-              <Feather name="calendar" size={13} color={showCustomDate ? colors.accent : colors.mutedForeground} />
-              <Text style={[styles.reminderText, { color: showCustomDate ? colors.accent : colors.mutedForeground }]}>
+              <Feather name="calendar" size={13} color={showCustomDate ? "#6466EF" : colors.mutedForeground} />
+              <Text style={[styles.reminderText, { color: showCustomDate ? "#6466EF" : colors.mutedForeground }]}>
                 Custom
               </Text>
             </Pressable>
           </View>
           {reminder && (
-            <View style={[styles.reminderSet, { backgroundColor: "#F59E0B" + "15" }]}>
+            <View style={[styles.reminderSet, { backgroundColor: "#F59E0B12", borderColor: "#F59E0B28" }]}>
               <Feather name="bell" size={13} color="#F59E0B" />
               <Text style={[styles.reminderSetText, { color: "#F59E0B" }]}>
                 Reminder set for {formatReminder(reminder)}
@@ -248,7 +260,7 @@ export default function AddScreen() {
 
         <Pressable onPress={handleSave} style={styles.saveBtn}>
           <LinearGradient
-            colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
+            colors={["#6466EF", "#784BEA", "#A56BF7"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.saveBtnGradient}
@@ -266,14 +278,14 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 20, gap: 22 },
   section: { gap: 8 },
-  label: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
+  label: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.9 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 13,
     gap: 10,
-    borderRadius: 13,
+    borderRadius: 14,
     borderWidth: 1,
   },
   input: {
@@ -287,7 +299,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    borderRadius: 13,
+    borderRadius: 14,
     borderWidth: 1,
   },
   textArea: {
@@ -295,7 +307,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    borderRadius: 13,
+    borderRadius: 14,
     borderWidth: 1,
     minHeight: 90,
   },
@@ -305,18 +317,19 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
-    gap: 5,
+    borderRadius: 9,
+    gap: 6,
+    borderWidth: 1,
   },
-  detectedText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  detectedText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   categoryScroll: { marginHorizontal: -16 },
   categoryRow: { flexDirection: "row", gap: 7, paddingHorizontal: 16 },
   categoryChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 6,
   },
@@ -325,9 +338,9 @@ const styles = StyleSheet.create({
   reminderChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 6,
   },
@@ -336,19 +349,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 10,
     gap: 7,
+    borderWidth: 1,
   },
   reminderSetText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
-  saveBtn: { borderRadius: 14, overflow: "hidden" },
+  saveBtn: { borderRadius: 16, overflow: "hidden", marginTop: 4 },
   saveBtnGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 17,
+    borderRadius: 16,
+    gap: 9,
   },
   saveBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
 });

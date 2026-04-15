@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
-import { Animated, Pressable, StyleSheet } from "react-native";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 interface FloatingAddButtonProps {
   onPress: () => void;
@@ -13,10 +13,10 @@ export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddBu
   const scale = useRef(new Animated.Value(1)).current;
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.9, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 10 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 12 }).start();
   }
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -25,13 +25,14 @@ export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddBu
 
   return (
     <Animated.View style={[styles.container, { bottom: bottomOffset, transform: [{ scale }] }]}>
+      <View style={styles.glow} />
       <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
         <LinearGradient
-          colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
+          colors={["#6466EF", "#784BEA", "#A56BF7"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradient}
@@ -47,11 +48,22 @@ const styles = StyleSheet.create({
   container: {
     position: "absolute",
     right: 20,
-    shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glow: {
+    position: "absolute",
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#784BEA",
+    opacity: 0.35,
+    transform: [{ scale: 1.2 }],
+    shadowColor: "#784BEA",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 0,
   },
   gradient: {
     width: 58,
@@ -59,5 +71,10 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#6466EF",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.7,
+    shadowRadius: 20,
+    elevation: 12,
   },
 });

@@ -18,7 +18,7 @@ import { CategoryCard } from "@/components/CategoryCard";
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 import { useColors } from "@/hooks/useColors";
 
-const CATEGORY_COLORS = ["#8B5CF6", "#3B82F6", "#06B6D4", "#F97316", "#EC4899", "#10B981", "#F59E0B", "#EF4444"];
+const CATEGORY_COLORS = ["#784BEA", "#6466EF", "#A56BF7", "#FA7DBA", "#2C6FD8", "#10B981", "#F59E0B", "#EF4444"];
 const CATEGORY_ICONS = ["folder", "heart", "star", "film", "coffee", "globe", "zap", "activity"];
 
 export default function CategoriesScreen() {
@@ -68,9 +68,9 @@ export default function CategoriesScreen() {
           <>
             <View style={styles.headerRow}>
               <View>
-                <Text style={[styles.title, { color: colors.foreground }]}>Categories</Text>
+                <Text style={[styles.title, { color: colors.foreground }]}>Collections</Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  {categories.length} collections
+                  {categories.length} {categories.length === 1 ? "category" : "categories"}
                 </Text>
               </View>
               <Pressable
@@ -78,9 +78,15 @@ export default function CategoriesScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setShowAdd(!showAdd);
                 }}
-                style={[styles.addBtn, { backgroundColor: showAdd ? colors.primary + "33" : colors.secondary, borderColor: showAdd ? colors.primary + "55" : colors.border }]}
+                style={[
+                  styles.addBtn,
+                  {
+                    backgroundColor: showAdd ? "#784BEA22" : colors.secondary,
+                    borderColor: showAdd ? "#784BEA55" : colors.border,
+                  },
+                ]}
               >
-                <Feather name={showAdd ? "x" : "plus"} size={18} color={showAdd ? colors.primary : colors.mutedForeground} />
+                <Feather name={showAdd ? "x" : "plus"} size={18} color={showAdd ? "#A56BF7" : colors.mutedForeground} />
               </Pressable>
             </View>
 
@@ -89,7 +95,7 @@ export default function CategoriesScreen() {
                 <TextInput
                   value={newName}
                   onChangeText={setNewName}
-                  placeholder="Category name..."
+                  placeholder="Collection name..."
                   placeholderTextColor={colors.mutedForeground}
                   style={[styles.input, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
                   autoFocus
@@ -103,9 +109,13 @@ export default function CategoriesScreen() {
                       style={[
                         styles.colorOption,
                         { backgroundColor: c },
-                        selectedColor === i && { borderWidth: 2.5, borderColor: "#fff" },
+                        selectedColor === i && styles.colorOptionSelected,
                       ]}
-                    />
+                    >
+                      {selectedColor === i && (
+                        <Feather name="check" size={12} color="#fff" />
+                      )}
+                    </Pressable>
                   ))}
                 </View>
                 <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>Icon</Text>
@@ -117,8 +127,8 @@ export default function CategoriesScreen() {
                       style={[
                         styles.iconOption,
                         {
-                          backgroundColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "25" : colors.secondary,
-                          borderColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "66" : colors.border,
+                          backgroundColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "22" : colors.secondary,
+                          borderColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "70" : colors.border,
                         },
                       ]}
                     >
@@ -130,14 +140,15 @@ export default function CategoriesScreen() {
                     </Pressable>
                   ))}
                 </View>
-                <Pressable onPress={handleAdd} style={{ borderRadius: 12, overflow: "hidden", marginTop: 4 }}>
+                <Pressable onPress={handleAdd} style={{ borderRadius: 14, overflow: "hidden", marginTop: 4 }}>
                   <LinearGradient
-                    colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
+                    colors={["#6466EF", "#784BEA", "#A56BF7"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.saveBtnGradient}
                   >
-                    <Text style={styles.saveBtnText}>Create Category</Text>
+                    <Feather name="plus" size={16} color="#fff" />
+                    <Text style={styles.saveBtnText}>Create Collection</Text>
                   </LinearGradient>
                 </Pressable>
               </View>
@@ -157,8 +168,10 @@ export default function CategoriesScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Feather name="folder" size={40} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No categories yet</Text>
+            <View style={[styles.emptyIconRing, { backgroundColor: "#784BEA12", borderColor: "#784BEA28" }]}>
+              <Feather name="folder" size={36} color="#A56BF7" style={{ opacity: 0.7 }} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No collections yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
               Tap + to create your first collection
             </Text>
@@ -176,7 +189,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 20,
   },
   title: {
     fontSize: 26,
@@ -189,32 +202,32 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
   addForm: {
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     gap: 10,
     marginBottom: 16,
     borderWidth: 1,
   },
   input: {
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    borderRadius: 11,
+    borderRadius: 12,
     borderWidth: 1,
   },
   formLabel: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginTop: 2,
   },
   optionsRow: {
@@ -223,22 +236,31 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   colorOption: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  colorOptionSelected: {
+    borderWidth: 2.5,
+    borderColor: "#fff",
   },
   iconOption: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
   saveBtnGradient: {
-    paddingVertical: 13,
+    paddingVertical: 14,
     alignItems: "center",
-    borderRadius: 12,
+    justifyContent: "center",
+    borderRadius: 14,
+    flexDirection: "row",
+    gap: 8,
   },
   saveBtnText: {
     color: "#fff",
@@ -249,13 +271,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 1,
-    marginBottom: 10,
+    marginBottom: 12,
     marginTop: 4,
   },
   emptyState: {
     alignItems: "center",
     paddingTop: 60,
-    gap: 10,
+    gap: 12,
+  },
+  emptyIconRing: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    marginBottom: 4,
   },
   emptyTitle: {
     fontSize: 17,

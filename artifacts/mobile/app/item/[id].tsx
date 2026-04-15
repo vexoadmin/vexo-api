@@ -32,9 +32,9 @@ const PLATFORM_ICONS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
-  youtube: "#FF0000",
-  tiktok: "#ffffff",
-  instagram: "#E1306C",
+  youtube: "#FF4040",
+  tiktok: "#E0E0FF",
+  instagram: "#F06292",
 };
 
 function formatReminder(ts: number) {
@@ -107,23 +107,25 @@ export default function ItemDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <LinearGradient
-          colors={[item.thumbnailColor + "DD", item.thumbnailColor + "55", "transparent"]}
+          colors={[item.thumbnailColor + "E0", item.thumbnailColor + "60", "transparent"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.hero}
         >
           <Pressable onPress={handleOpenLink} style={styles.bigPlay}>
-            <View style={styles.bigPlayInner}>
-              <Feather name="play" size={30} color="#fff" />
+            <View style={styles.bigPlayRing}>
+              <View style={styles.bigPlayInner}>
+                <Feather name="play" size={28} color="#fff" style={{ marginLeft: 3 }} />
+              </View>
             </View>
           </Pressable>
         </LinearGradient>
 
         <View style={styles.body}>
           <View style={styles.metaRow}>
-            <View style={[styles.platformBadge, { backgroundColor: item.thumbnailColor + "20" }]}>
-              <Feather name={PLATFORM_ICONS[item.platform] as any} size={12} color={PLATFORM_COLORS[item.platform]} />
-              <Text style={[styles.platformText, { color: colors.mutedForeground }]}>
+            <View style={[styles.platformBadge, { backgroundColor: PLATFORM_COLORS[item.platform] + "18", borderColor: PLATFORM_COLORS[item.platform] + "30" }]}>
+              <Feather name={PLATFORM_ICONS[item.platform] as any} size={11} color={PLATFORM_COLORS[item.platform]} />
+              <Text style={[styles.platformText, { color: PLATFORM_COLORS[item.platform] }]}>
                 {PLATFORM_LABELS[item.platform]}
               </Text>
             </View>
@@ -132,37 +134,47 @@ export default function ItemDetailScreen() {
 
           <Text style={[styles.title, { color: colors.foreground }]}>{item.title}</Text>
 
-          <View style={[styles.categoryBadge, { backgroundColor: item.thumbnailColor + "18" }]}>
+          <View style={[styles.categoryBadge, { backgroundColor: item.thumbnailColor + "18", borderColor: item.thumbnailColor + "28" }]}>
             <View style={[styles.dot, { backgroundColor: item.thumbnailColor }]} />
             <Text style={[styles.categoryText, { color: item.thumbnailColor }]}>{item.category}</Text>
           </View>
         </View>
 
         {hasReminder && (
-          <View style={[styles.card, { backgroundColor: "#F59E0B" + "12", borderColor: "#F59E0B" + "30" }]}>
+          <View style={[styles.card, { backgroundColor: "#F59E0B0E", borderColor: "#F59E0B28" }]}>
             <View style={styles.cardHeader}>
-              <Feather name="bell" size={15} color="#F59E0B" />
-              <Text style={[styles.cardTitle, { color: "#F59E0B" }]}>Reminder</Text>
+              <View style={[styles.cardIconWrap, { backgroundColor: "#F59E0B18" }]}>
+                <Feather name="bell" size={14} color="#F59E0B" />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Reminder</Text>
+              <Pressable
+                onPress={() => updateItem(item.id, { reminder: undefined })}
+                style={[styles.clearBtn, { borderColor: colors.border }]}
+              >
+                <Text style={[styles.clearBtnText, { color: colors.mutedForeground }]}>Clear</Text>
+              </Pressable>
             </View>
-            <Text style={[styles.reminderText, { color: colors.foreground }]}>
+            <Text style={[styles.reminderText, { color: "#F59E0B" }]}>
               {formatReminder(item.reminder!)}
             </Text>
-            <Pressable onPress={() => updateItem(item.id, { reminder: undefined })} style={styles.clearReminder}>
-              <Text style={[styles.clearText, { color: "#F59E0B" }]}>Clear reminder</Text>
-            </Pressable>
           </View>
         )}
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Feather name="edit-3" size={15} color={colors.primary} />
+            <View style={[styles.cardIconWrap, { backgroundColor: "#784BEA18" }]}>
+              <Feather name="edit-3" size={14} color="#A56BF7" />
+            </View>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Notes</Text>
             <Pressable
               onPress={() => {
                 if (editingNotes) handleSaveNotes();
                 else setEditingNotes(true);
               }}
-              style={[styles.editBtn, { backgroundColor: editingNotes ? colors.primary : colors.secondary }]}
+              style={[
+                styles.editBtn,
+                { backgroundColor: editingNotes ? "#784BEA" : colors.secondary, borderColor: editingNotes ? "#784BEA" : colors.border },
+              ]}
             >
               <Text style={[styles.editBtnText, { color: editingNotes ? "#fff" : colors.mutedForeground }]}>
                 {editingNotes ? "Save" : "Edit"}
@@ -187,30 +199,39 @@ export default function ItemDetailScreen() {
           )}
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: "#6466EF22" }]}>
           <View style={styles.cardHeader}>
-            <Feather name="zap" size={15} color={colors.accent} />
+            <LinearGradient
+              colors={["#6466EF", "#A56BF7"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardIconWrap}
+            >
+              <Feather name="zap" size={14} color="#fff" />
+            </LinearGradient>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Insights</Text>
-            <View style={[styles.comingSoonBadge, { backgroundColor: colors.accent + "18" }]}>
-              <Text style={[styles.comingSoonText, { color: colors.accent }]}>Soon</Text>
+            <View style={[styles.comingSoonBadge, { backgroundColor: "#6466EF18", borderColor: "#6466EF30" }]}>
+              <Text style={[styles.comingSoonText, { color: "#A56BF7" }]}>Coming soon</Text>
             </View>
           </View>
           <Text style={[styles.notesText, { color: colors.mutedForeground }]}>
-            Auto-generated summary, key takeaways, and related content suggestions are coming soon.
+            Auto-generated summaries, key takeaways, and related content suggestions.
           </Text>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Feather name="link" size={15} color={colors.mutedForeground} />
+            <View style={[styles.cardIconWrap, { backgroundColor: colors.secondary }]}>
+              <Feather name="link" size={14} color={colors.mutedForeground} />
+            </View>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Source</Text>
           </View>
-          <Text style={[styles.urlText, { color: colors.accent }]} numberOfLines={2}>{item.url}</Text>
+          <Text style={[styles.urlText, { color: "#6466EF" }]} numberOfLines={2}>{item.url}</Text>
         </View>
 
         <Pressable onPress={handleOpenLink} style={styles.openBtn}>
           <LinearGradient
-            colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
+            colors={["#6466EF", "#784BEA", "#A56BF7"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.openBtnGrad}
@@ -221,7 +242,7 @@ export default function ItemDetailScreen() {
         </Pressable>
 
         <Pressable onPress={handleDelete} style={[styles.deleteBtn, { borderColor: colors.border }]}>
-          <Feather name="trash-2" size={16} color={colors.destructive} />
+          <Feather name="trash-2" size={15} color={colors.destructive} />
           <Text style={[styles.deleteBtnText, { color: colors.destructive }]}>Delete Video</Text>
         </Pressable>
       </ScrollView>
@@ -233,21 +254,28 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { gap: 12 },
   hero: {
-    height: 180,
+    height: 200,
     justifyContent: "center",
     alignItems: "center",
   },
   bigPlay: { alignItems: "center" },
-  bigPlayInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(255,255,255,0.2)",
+  bigPlayRing: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(255,255,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    paddingLeft: 3,
   },
-  body: { paddingHorizontal: 16, gap: 8 },
+  bigPlayInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  body: { paddingHorizontal: 16, gap: 10 },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -256,44 +284,61 @@ const styles = StyleSheet.create({
   platformBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
     gap: 5,
+    borderWidth: 1,
   },
-  platformText: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  platformText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   date: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  title: { fontSize: 21, fontFamily: "Inter_700Bold", lineHeight: 27, letterSpacing: -0.5 },
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", lineHeight: 28, letterSpacing: -0.5 },
   categoryBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
+    gap: 6,
+    borderWidth: 1,
   },
   dot: { width: 6, height: 6, borderRadius: 3 },
   categoryText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   card: {
     marginHorizontal: 16,
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    gap: 10,
+    gap: 12,
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 10,
+  },
+  cardIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold", flex: 1 },
   editBtn: {
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  editBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  clearBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 8,
+    borderWidth: 1,
   },
-  editBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  clearBtnText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   notesInput: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -309,31 +354,35 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     lineHeight: 21,
   },
-  reminderText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  clearReminder: { alignSelf: "flex-start" },
-  clearText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  comingSoonBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  reminderText: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  comingSoonBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
   comingSoonText: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   urlText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
-  openBtn: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
+  openBtn: { marginHorizontal: 16, borderRadius: 16, overflow: "hidden" },
   openBtnGrad: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 15,
-    borderRadius: 14,
+    paddingVertical: 16,
+    borderRadius: 16,
     gap: 8,
   },
-  openBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  openBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
   deleteBtn: {
     marginHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 13,
-    borderRadius: 14,
+    paddingVertical: 14,
+    borderRadius: 16,
     borderWidth: 1,
     gap: 7,
+    marginBottom: 8,
   },
   deleteBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
 });

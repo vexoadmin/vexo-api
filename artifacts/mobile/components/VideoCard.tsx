@@ -14,9 +14,9 @@ const PLATFORM_ICONS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
-  youtube: "#FF0000",
-  tiktok: "#ffffff",
-  instagram: "#E1306C",
+  youtube: "#FF4040",
+  tiktok: "#E0E0FF",
+  instagram: "#F06292",
 };
 
 interface VideoCardProps {
@@ -28,26 +28,14 @@ interface VideoCardProps {
 export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   const colors = useColors();
   const scale = useRef(new Animated.Value(1)).current;
-  const height = isLarge ? 190 : 140;
+  const height = isLarge ? 196 : 148;
 
   function handlePressIn() {
-    Animated.spring(scale, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      speed: 40,
-      bounciness: 2,
-    }).start();
+    Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40, bounciness: 2 }).start();
   }
-
   function handlePressOut() {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 30,
-      bounciness: 6,
-    }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
   }
-
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -59,16 +47,16 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.card, { backgroundColor: colors.card }]}
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
         <LinearGradient
-          colors={[item.thumbnailColor + "EE", item.thumbnailColor + "99", item.thumbnailColor + "44"]}
+          colors={[item.thumbnailColor + "F0", item.thumbnailColor + "A0", item.thumbnailColor + "50"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.thumbnail, { height }]}
         >
           <View style={styles.topRow}>
-            <View style={[styles.platformBadge, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
+            <View style={[styles.platformBadge, { backgroundColor: "rgba(0,0,0,0.45)", borderColor: "rgba(255,255,255,0.08)" }]}>
               <Feather
                 name={PLATFORM_ICONS[item.platform] as any}
                 size={10}
@@ -76,12 +64,16 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
               />
             </View>
             {item.reminder && item.reminder > Date.now() && (
-              <View style={[styles.reminderDot, { backgroundColor: "#F59E0B" }]} />
+              <View style={styles.reminderDot}>
+                <View style={styles.reminderDotInner} />
+              </View>
             )}
           </View>
           <View style={styles.playWrap}>
-            <View style={styles.playButton}>
-              <Feather name="play" size={16} color="#fff" />
+            <View style={styles.playRing}>
+              <View style={styles.playButton}>
+                <Feather name="play" size={14} color="#fff" style={{ marginLeft: 2 }} />
+              </View>
             </View>
           </View>
         </LinearGradient>
@@ -96,7 +88,7 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
             </Text>
           ) : null}
           <View style={styles.footer}>
-            <View style={[styles.categoryPill, { backgroundColor: item.thumbnailColor + "20" }]}>
+            <View style={[styles.categoryPill, { backgroundColor: item.thumbnailColor + "1C" }]}>
               <View style={[styles.dot, { backgroundColor: item.thumbnailColor }]} />
               <Text style={[styles.categoryText, { color: item.thumbnailColor }]}>
                 {item.category}
@@ -112,10 +104,16 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
 const styles = StyleSheet.create({
   container: {
     marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
   },
   card: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
+    borderWidth: 1,
   },
   thumbnail: {
     justifyContent: "space-between",
@@ -127,36 +125,53 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   platformBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
   reminderDot: {
-    width: 8,
-    height: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(245,158,11,0.15)",
+  },
+  reminderDotInner: {
+    width: 7,
+    height: 7,
     borderRadius: 4,
+    backgroundColor: "#F59E0B",
   },
   playWrap: {
     alignItems: "center",
     justifyContent: "center",
     flex: 1,
   },
+  playRing: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   playButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.22)",
     alignItems: "center",
     justifyContent: "center",
-    paddingLeft: 2,
   },
   info: {
-    paddingHorizontal: 11,
-    paddingTop: 9,
-    paddingBottom: 11,
-    gap: 3,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 4,
   },
   title: {
     fontSize: 13,
@@ -171,15 +186,15 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: "row",
-    marginTop: 5,
+    marginTop: 6,
   },
   categoryPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    gap: 4,
+    gap: 5,
   },
   dot: {
     width: 5,
@@ -189,6 +204,6 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
   },
 });

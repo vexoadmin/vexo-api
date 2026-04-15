@@ -41,29 +41,30 @@ export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={{ borderRadius: 16, overflow: "hidden" }}
+        style={{ borderRadius: 18, overflow: "hidden" }}
       >
         <LinearGradient
-          colors={[
-            hexToRgba(category.color, 0.18),
-            hexToRgba(category.color, 0.06),
-            "transparent",
-          ]}
+          colors={[hexToRgba(category.color, 0.14), hexToRgba(category.color, 0.04)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.gradient, { backgroundColor: colors.card, borderColor: hexToRgba(category.color, 0.15) }]}
+          style={[
+            styles.gradient,
+            { backgroundColor: colors.card, borderColor: hexToRgba(category.color, 0.18) },
+          ]}
         >
-          <View style={[styles.iconContainer, { backgroundColor: hexToRgba(category.color, 0.15) }]}>
-            <Feather name={category.icon as any} size={24} color={category.color} />
+          <View style={[styles.iconContainer, { backgroundColor: hexToRgba(category.color, 0.14), borderColor: hexToRgba(category.color, 0.22) }]}>
+            <Feather name={category.icon as any} size={22} color={category.color} />
           </View>
+
           <View style={styles.info}>
             <Text style={[styles.name, { color: colors.foreground }]}>{category.name}</Text>
             <Text style={[styles.count, { color: colors.mutedForeground }]}>
               {itemCount} {itemCount === 1 ? "video" : "videos"}
             </Text>
           </View>
-          <View style={[styles.arrow, { backgroundColor: hexToRgba(category.color, 0.12) }]}>
-            <Feather name="chevron-right" size={18} color={category.color} />
+
+          <View style={[styles.arrow, { backgroundColor: hexToRgba(category.color, 0.12), borderColor: hexToRgba(category.color, 0.2) }]}>
+            <Feather name="chevron-right" size={16} color={category.color} />
           </View>
         </LinearGradient>
       </Pressable>
@@ -73,7 +74,12 @@ export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 8,
+    marginBottom: 9,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
   },
   gradient: {
     flexDirection: "row",
@@ -81,14 +87,15 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
   },
   iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
+    width: 52,
+    height: 52,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
   info: {
     flex: 1,
@@ -104,10 +111,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   arrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
 });
