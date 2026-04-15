@@ -17,11 +17,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useSavedItems } from "@/contexts/SavedItemsContext";
-import { useColors } from "@/hooks/useColors";
 
-const GRADIENT_COLORS = [
-  "#784BEA", "#6466EF", "#A56BF7", "#FA7DBA",
-  "#2C6FD8", "#10B981", "#F59E0B", "#D15780",
+const BG = "#0B0B12";
+const SURFACE = "#11131F";
+const BORDER = "#1A1B2E";
+const MUTED = "#9CA3AF";
+
+const ACCENT_COLORS = [
+  "#7C5CFF", "#4CC9F0", "#A78BFA", "#F472B6",
+  "#34D399", "#FBBF24", "#60A5FA", "#F87171",
 ];
 
 function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null {
@@ -32,21 +36,33 @@ function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null 
   return null;
 }
 
+const PLATFORM_COLORS: Record<string, string> = {
+  youtube: "#FF5252",
+  tiktok: "#A0AAFF",
+  instagram: "#E879A0",
+};
+const PLATFORM_ICONS: Record<string, string> = {
+  youtube: "youtube",
+  tiktok: "music",
+  instagram: "instagram",
+};
+const PLATFORM_NAMES: Record<string, string> = {
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  instagram: "Instagram",
+};
+
 const REMINDER_OPTIONS = [
-  { label: "Tomorrow", icon: "sun" as const, getValue: () => Date.now() + 86400000 },
-  {
-    label: "Weekend", icon: "coffee" as const, getValue: () => {
-      const now = new Date();
-      const day = now.getDay();
-      const daysUntilSat = (6 - day + 7) % 7 || 7;
-      return Date.now() + daysUntilSat * 86400000;
-    },
-  },
-  { label: "Next Week", icon: "calendar" as const, getValue: () => Date.now() + 7 * 86400000 },
+  { label: "Tomorrow",  icon: "sun" as const,      getValue: () => Date.now() + 86400000 },
+  { label: "Weekend",   icon: "coffee" as const,    getValue: () => {
+    const now = new Date(); const day = now.getDay();
+    const daysUntilSat = (6 - day + 7) % 7 || 7;
+    return Date.now() + daysUntilSat * 86400000;
+  }},
+  { label: "Next Week", icon: "calendar" as const,  getValue: () => Date.now() + 7 * 86400000 },
 ];
 
 export default function AddScreen() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { categories, addItem } = useSavedItems();
@@ -71,52 +87,54 @@ export default function AddScreen() {
       platform: detectedPlatform,
       category: selectedCategory,
       notes: notes.trim(),
-      thumbnailColor: GRADIENT_COLORS[Math.floor(Math.random() * GRADIENT_COLORS.length)],
+      thumbnailColor: ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)],
       reminder,
     });
     router.back();
   }
 
   function formatReminder(ts: number) {
-    return new Date(ts).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    return new Date(ts).toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+    });
   }
 
-  const PLATFORM_COLORS: Record<string, string> = { youtube: "#FF4040", tiktok: "#E0E0FF", instagram: "#F06292" };
-  const PLATFORM_ICONS: Record<string, string> = { youtube: "youtube", tiktok: "music", instagram: "instagram" };
-  const PLATFORM_NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" };
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>VIDEO LINK</Text>
-          <View style={[
-            styles.inputRow,
-            {
-              backgroundColor: colors.secondary,
-              borderColor: detectedPlatform ? "#784BEA55" : colors.border,
-            },
-          ]}>
-            <Feather name="link-2" size={16} color={detectedPlatform ? "#A56BF7" : colors.mutedForeground} />
+        {/* ── Video Link ── */}
+        <View style={styles.field}>
+          <Text style={styles.label}>VIDEO LINK</Text>
+          <View style={[styles.inputRow, detectedPlatform && styles.inputRowActive]}>
+            <Feather
+              name="link-2"
+              size={15}
+              color={detectedPlatform ? "#7C5CFF" : "#4A5170"}
+            />
             <TextInput
               value={url}
               onChangeText={setUrl}
               placeholder="Paste YouTube, TikTok, or Instagram link"
-              placeholderTextColor={colors.mutedForeground}
-              style={[styles.input, { color: colors.foreground }]}
+              placeholderTextColor="#4A5170"
+              style={styles.inputText}
               autoCapitalize="none"
               keyboardType="url"
             />
           </View>
           {detectedPlatform && (
-            <View style={[styles.detected, { backgroundColor: PLATFORM_COLORS[detectedPlatform] + "14", borderColor: PLATFORM_COLORS[detectedPlatform] + "30" }]}>
+            <View
+              style={[
+                styles.detected,
+                { backgroundColor: PLATFORM_COLORS[detectedPlatform] + "12", borderColor: PLATFORM_COLORS[detectedPlatform] + "28" },
+              ]}
+            >
               <Feather
                 name={PLATFORM_ICONS[detectedPlatform] as any}
-                size={12}
+                size={11}
                 color={PLATFORM_COLORS[detectedPlatform]}
               />
               <Text style={[styles.detectedText, { color: PLATFORM_COLORS[detectedPlatform] }]}>
@@ -126,40 +144,40 @@ export default function AddScreen() {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>TITLE</Text>
+        {/* ── Title ── */}
+        <View style={styles.field}>
+          <Text style={styles.label}>TITLE</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
             placeholder="Give it a memorable title"
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.textInput, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
+            placeholderTextColor="#4A5170"
+            style={styles.input}
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>CATEGORY</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-            <View style={styles.categoryRow}>
+        {/* ── Category ── */}
+        <View style={styles.field}>
+          <Text style={styles.label}>CATEGORY</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+            <View style={styles.chipRow}>
               {categories.map((cat) => {
-                const selected = selectedCategory === cat.name;
+                const active = selectedCategory === cat.name;
                 return (
                   <Pressable
                     key={cat.id}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setSelectedCategory(cat.name);
-                    }}
+                    onPress={() => { Haptics.selectionAsync(); setSelectedCategory(cat.name); }}
                     style={[
-                      styles.categoryChip,
-                      {
-                        backgroundColor: selected ? cat.color + "20" : colors.secondary,
-                        borderColor: selected ? cat.color + "60" : colors.border,
-                      },
+                      styles.catChip,
+                      active && { backgroundColor: cat.color + "18", borderColor: cat.color + "50" },
                     ]}
                   >
-                    <Feather name={cat.icon as any} size={13} color={selected ? cat.color : colors.mutedForeground} />
-                    <Text style={[styles.chipText, { color: selected ? cat.color : colors.mutedForeground }]}>
+                    <Feather
+                      name={cat.icon as any}
+                      size={12}
+                      color={active ? cat.color : "#4A5170"}
+                    />
+                    <Text style={[styles.catChipText, active && { color: cat.color }]}>
                       {cat.name}
                     </Text>
                   </Pressable>
@@ -169,23 +187,25 @@ export default function AddScreen() {
           </ScrollView>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>NOTES</Text>
+        {/* ── Notes ── */}
+        <View style={styles.field}>
+          <Text style={styles.label}>NOTES</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
             placeholder="Add notes, timestamps, or thoughts..."
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.textArea, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
+            placeholderTextColor="#4A5170"
+            style={styles.textArea}
             multiline
             numberOfLines={3}
             textAlignVertical="top"
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>REMINDER</Text>
-          <View style={styles.reminderGrid}>
+        {/* ── Reminder ── */}
+        <View style={styles.field}>
+          <Text style={styles.label}>REMINDER</Text>
+          <View style={styles.chipRow}>
             {REMINDER_OPTIONS.map((opt) => {
               const val = opt.getValue();
               const active = reminder !== undefined && Math.abs(reminder - val) < 3600000;
@@ -199,14 +219,11 @@ export default function AddScreen() {
                   }}
                   style={[
                     styles.reminderChip,
-                    {
-                      backgroundColor: active ? "#784BEA20" : colors.secondary,
-                      borderColor: active ? "#784BEA55" : colors.border,
-                    },
+                    active && styles.reminderChipActive,
                   ]}
                 >
-                  <Feather name={opt.icon} size={13} color={active ? "#A56BF7" : colors.mutedForeground} />
-                  <Text style={[styles.reminderText, { color: active ? "#A56BF7" : colors.mutedForeground }]}>
+                  <Feather name={opt.icon} size={12} color={active ? "#7C5CFF" : "#4A5170"} />
+                  <Text style={[styles.reminderChipText, active && { color: "#7C5CFF" }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -219,53 +236,53 @@ export default function AddScreen() {
               }}
               style={[
                 styles.reminderChip,
-                {
-                  backgroundColor: showCustomDate ? "#6466EF20" : colors.secondary,
-                  borderColor: showCustomDate ? "#6466EF55" : colors.border,
-                },
+                showCustomDate && styles.reminderChipActive,
               ]}
             >
-              <Feather name="calendar" size={13} color={showCustomDate ? "#6466EF" : colors.mutedForeground} />
-              <Text style={[styles.reminderText, { color: showCustomDate ? "#6466EF" : colors.mutedForeground }]}>
+              <Feather name="calendar" size={12} color={showCustomDate ? "#7C5CFF" : "#4A5170"} />
+              <Text style={[styles.reminderChipText, showCustomDate && { color: "#7C5CFF" }]}>
                 Custom
               </Text>
             </Pressable>
           </View>
+
           {reminder && (
-            <View style={[styles.reminderSet, { backgroundColor: "#F59E0B12", borderColor: "#F59E0B28" }]}>
-              <Feather name="bell" size={13} color="#F59E0B" />
-              <Text style={[styles.reminderSetText, { color: "#F59E0B" }]}>
-                Reminder set for {formatReminder(reminder)}
+            <View style={styles.reminderSet}>
+              <Feather name="bell" size={12} color="#7C5CFF" />
+              <Text style={styles.reminderSetText}>
+                Reminder: {formatReminder(reminder)}
               </Text>
-              <Pressable onPress={() => setReminder(undefined)}>
-                <Feather name="x" size={13} color="#F59E0B" />
+              <Pressable onPress={() => setReminder(undefined)} hitSlop={8}>
+                <Feather name="x" size={12} color="#4A5170" />
               </Pressable>
             </View>
           )}
+
           {showCustomDate && Platform.OS !== "web" && (
             <DateTimePicker
               value={reminder ? new Date(reminder) : new Date(Date.now() + 86400000)}
               mode="date"
               minimumDate={new Date()}
               onChange={(_, date) => {
-                if (date) {
-                  setReminder(date.getTime());
-                  setShowCustomDate(false);
-                }
+                if (date) { setReminder(date.getTime()); setShowCustomDate(false); }
               }}
               themeVariant="dark"
             />
           )}
         </View>
 
-        <Pressable onPress={handleSave} style={styles.saveBtn}>
+        {/* ── Save button ── */}
+        <Pressable
+          onPress={handleSave}
+          style={({ pressed }) => [styles.saveWrap, { opacity: pressed ? 0.85 : 1 }]}
+        >
           <LinearGradient
-            colors={["#6466EF", "#784BEA", "#A56BF7"]}
+            colors={["#7C5CFF", "#4CC9F0"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.saveBtnGradient}
+            style={styles.saveBtn}
           >
-            <Feather name="bookmark" size={18} color="#fff" />
+            <Feather name="bookmark" size={17} color="#fff" />
             <Text style={styles.saveBtnText}>Save Video</Text>
           </LinearGradient>
         </Pressable>
@@ -275,94 +292,169 @@ export default function AddScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 20, gap: 22 },
-  section: { gap: 8 },
-  label: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.9 },
+  container: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    gap: 24,
+  },
+
+  field: {
+    gap: 10,
+  },
+  label: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1,
+    color: "#4A5170",
+  },
+
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    gap: 10,
-    borderRadius: 14,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
     borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
   },
-  input: {
+  inputRowActive: {
+    borderColor: "#7C5CFF40",
+  },
+  inputText: {
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
+    color: "#FFFFFF",
     paddingVertical: 0,
   },
-  textInput: {
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+
+  input: {
+    backgroundColor: SURFACE,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    borderRadius: 14,
-    borderWidth: 1,
+    color: "#FFFFFF",
   },
+
   textArea: {
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    borderRadius: 14,
-    borderWidth: 1,
-    minHeight: 90,
+    color: "#FFFFFF",
+    minHeight: 96,
+    textAlignVertical: "top",
   },
+
   detected: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 9,
+    borderRadius: 8,
     gap: 6,
     borderWidth: 1,
   },
-  detectedText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  categoryScroll: { marginHorizontal: -16 },
-  categoryRow: { flexDirection: "row", gap: 7, paddingHorizontal: 16 },
-  categoryChip: {
+  detectedText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  chipScroll: {
+    marginHorizontal: -20,
+  },
+  chipRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 20,
   },
-  chipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  reminderGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  reminderChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  reminderText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  reminderSet: {
+  catChip: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 10,
-    gap: 7,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SURFACE,
+    gap: 6,
   },
-  reminderSetText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
-  saveBtn: { borderRadius: 16, overflow: "hidden", marginTop: 4 },
-  saveBtnGradient: {
+  catChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#4A5170",
+  },
+
+  reminderChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SURFACE,
+    gap: 6,
+  },
+  reminderChipActive: {
+    backgroundColor: "#7C5CFF14",
+    borderColor: "#7C5CFF40",
+  },
+  reminderChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#4A5170",
+  },
+
+  reminderSet: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7C5CFF12",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#7C5CFF28",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 8,
+  },
+  reminderSetText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#7C5CFF",
+  },
+
+  saveWrap: {
+    borderRadius: 18,
+    overflow: "hidden",
+    marginTop: 4,
+  },
+  saveBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 17,
-    borderRadius: 16,
+    paddingVertical: 18,
     gap: 9,
   },
-  saveBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  saveBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
 });

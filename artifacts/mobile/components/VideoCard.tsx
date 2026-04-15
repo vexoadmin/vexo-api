@@ -11,17 +11,15 @@ const PLATFORM_ICONS: Record<string, string> = {
   tiktok: "music",
   instagram: "instagram",
 };
-
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   tiktok: "TikTok",
   instagram: "Instagram",
 };
-
 const PLATFORM_COLORS: Record<string, string> = {
-  youtube: "#FF4040",
+  youtube: "#FF5252",
   tiktok: "#A0AAFF",
-  instagram: "#E8749A",
+  instagram: "#E879A0",
 };
 
 interface VideoCardProps {
@@ -32,25 +30,15 @@ interface VideoCardProps {
 
 export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
-  const height = isLarge ? 216 : 156;
+  const cardHeight = isLarge ? 268 : 182;
   const accent = item.thumbnailColor;
-  const platformColor = PLATFORM_COLORS[item.platform] ?? "#784BEA";
+  const platformColor = PLATFORM_COLORS[item.platform] ?? "#7C5CFF";
 
   function handlePressIn() {
-    Animated.spring(scale, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 1,
-    }).start();
+    Animated.spring(scale, { toValue: 0.965, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 30,
-      bounciness: 8,
-    }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 32, bounciness: 6 }).start();
   }
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -58,107 +46,75 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   }
 
   return (
-    <Animated.View
-      style={[
-        styles.wrapper,
-        {
-          transform: [{ scale }],
-          shadowColor: accent,
-        },
-      ]}
-    >
+    <Animated.View style={[styles.wrapper, { transform: [{ scale }] }]}>
       <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={styles.card}
+        style={[styles.card, { height: cardHeight }]}
       >
-        {/* ── Thumbnail ── */}
-        <View style={[styles.thumbnail, { height }]}>
-          {/* Deep dark base */}
-          <LinearGradient
-            colors={["#0A0C1C", "#060810"]}
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Subtle colour wash from top-left corner */}
-          <LinearGradient
-            colors={[accent + "30", accent + "08", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Bottom vignette to give depth */}
-          <LinearGradient
-            colors={["transparent", "rgba(4,5,14,0.82)"]}
-            start={{ x: 0, y: 0.25 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
+        {/* Dark base */}
+        <View style={[StyleSheet.absoluteFill, styles.cardBg]} />
 
-          {/* Top row – platform badge */}
-          <View style={styles.topRow}>
-            <View
-              style={[
-                styles.platformBadge,
-                { borderColor: platformColor + "35" },
-              ]}
-            >
-              <Feather
-                name={PLATFORM_ICONS[item.platform] as any}
-                size={9}
-                color={platformColor}
-              />
-            </View>
+        {/* Very subtle colour tint at top — 10% opacity max */}
+        <LinearGradient
+          colors={[accent + "1A", "transparent"]}
+          start={{ x: 0.3, y: 0 }}
+          end={{ x: 0.8, y: 0.55 }}
+          style={StyleSheet.absoluteFill}
+        />
 
-            {item.reminder && item.reminder > Date.now() && (
-              <View style={styles.reminderPip}>
-                <View style={styles.reminderPipCore} />
-              </View>
-            )}
+        {/* Large platform watermark */}
+        <View style={styles.watermark} pointerEvents="none">
+          <Feather
+            name={PLATFORM_ICONS[item.platform] as any}
+            size={64}
+            color="rgba(255,255,255,0.035)"
+          />
+        </View>
+
+        {/* Platform badge — top left */}
+        <View style={styles.topRow}>
+          <View style={[styles.platformBadge, { borderColor: platformColor + "28" }]}>
+            <Feather
+              name={PLATFORM_ICONS[item.platform] as any}
+              size={9}
+              color={platformColor}
+            />
           </View>
+          {item.reminder && item.reminder > Date.now() && (
+            <View style={styles.reminderDot} />
+          )}
+        </View>
 
-          {/* Centred play button – minimal frosted glass */}
-          <View style={styles.playCenter}>
-            <View style={styles.playRing}>
-              <View style={styles.playInner}>
-                <Feather
-                  name="play"
-                  size={11}
-                  color="rgba(255,255,255,0.9)"
-                  style={{ marginLeft: 2 }}
-                />
-              </View>
-            </View>
+        {/* Play button — center */}
+        <View style={styles.playWrap}>
+          <View style={styles.playBtn}>
+            <Feather name="play" size={11} color="rgba(255,255,255,0.75)" style={{ marginLeft: 2 }} />
           </View>
         </View>
 
-        {/* ── Info ── */}
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={2}>
-            {item.title}
-          </Text>
-
+        {/* Bottom gradient overlay with title + meta */}
+        <LinearGradient
+          colors={["transparent", "rgba(8,8,14,0.82)", "#08080E"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.overlay}
+        >
           {item.notes ? (
-            <Text style={styles.notes} numberOfLines={1}>
-              {item.notes}
-            </Text>
+            <Text style={styles.notes} numberOfLines={1}>{item.notes}</Text>
           ) : null}
-
+          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
           <View style={styles.footer}>
-            {/* Category pill */}
-            <View style={[styles.catPill, { backgroundColor: accent + "16" }]}>
+            <View style={[styles.catTag, { backgroundColor: accent + "14" }]}>
               <View style={[styles.catDot, { backgroundColor: accent }]} />
-              <Text style={[styles.catText, { color: accent + "DD" }]}>
-                {item.category}
-              </Text>
+              <Text style={[styles.catText, { color: accent + "CC" }]}>{item.category}</Text>
             </View>
-
-            {/* Platform label */}
-            <Text style={[styles.platformLabel, { color: platformColor + "80" }]}>
+            <Text style={[styles.platformLabel, { color: platformColor + "70" }]}>
               {PLATFORM_LABELS[item.platform]}
             </Text>
           </View>
-        </View>
+        </LinearGradient>
       </Pressable>
     </Animated.View>
   );
@@ -167,106 +123,98 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 10,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 10,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#171B30",
-    backgroundColor: "#080A18",
-  },
-  thumbnail: {
+    borderColor: "#1A1B2E",
     justifyContent: "space-between",
-    padding: 10,
+  },
+  cardBg: {
+    backgroundColor: "#0C0E1C",
+    borderRadius: 18,
+  },
+  watermark: {
+    position: "absolute",
+    top: "30%",
+    left: "50%",
+    marginLeft: -32,
+    opacity: 1,
   },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    padding: 10,
   },
   platformBadge: {
     width: 26,
     height: 26,
     borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
     borderWidth: 1,
-    backgroundColor: "rgba(8,10,24,0.75)",
-  },
-  reminderPip: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "rgba(245,158,11,0.14)",
+    backgroundColor: "rgba(10,10,20,0.7)",
     alignItems: "center",
     justifyContent: "center",
   },
-  reminderPipCore: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  reminderDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
     backgroundColor: "#F59E0B",
+    opacity: 0.85,
   },
-  playCenter: {
-    flex: 1,
+  playWrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 56,
     alignItems: "center",
     justifyContent: "center",
   },
-  playRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
+  playBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.07)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
   },
-  playInner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  info: {
+  overlay: {
     paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingTop: 24,
     paddingBottom: 12,
-    gap: 5,
-    backgroundColor: "#080A18",
+    gap: 4,
+  },
+  notes: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(156,163,175,0.7)",
+    marginBottom: 1,
   },
   title: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     lineHeight: 18,
-    letterSpacing: -0.15,
-    color: "#DDE0F8",
-  },
-  notes: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 15,
-    color: "#3E4860",
+    letterSpacing: -0.2,
+    color: "#ECEEFF",
   },
   footer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 6,
+    marginTop: 5,
   },
-  catPill: {
+  catTag: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
-    gap: 5,
+    gap: 4,
   },
   catDot: {
     width: 4,
@@ -276,11 +224,10 @@ const styles = StyleSheet.create({
   catText: {
     fontSize: 10,
     fontFamily: "Inter_500Medium",
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   platformLabel: {
     fontSize: 10,
     fontFamily: "Inter_400Regular",
-    letterSpacing: 0.1,
   },
 });

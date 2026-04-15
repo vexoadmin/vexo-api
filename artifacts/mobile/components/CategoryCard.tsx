@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,10 +16,10 @@ export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps
   const c = category.color;
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 40, bounciness: 2 }).start();
+    Animated.spring(scale, { toValue: 0.975, useNativeDriver: true, speed: 45, bounciness: 0 }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 32, bounciness: 6 }).start();
   }
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -28,41 +27,28 @@ export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps
   }
 
   return (
-    <Animated.View style={[styles.wrapper, { transform: [{ scale }], shadowColor: c }]}>
+    <Animated.View style={[styles.wrapper, { transform: [{ scale }] }]}>
       <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.card, { borderColor: c + "30" }]}
+        style={styles.card}
       >
-        <LinearGradient
-          colors={[c + "28", c + "10", "#0D1025"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        >
-          <LinearGradient
-            colors={[c + "20", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.4, y: 1 }}
-            style={styles.leftAccent}
-          />
+        {/* Icon circle — only element with category colour */}
+        <View style={[styles.iconCircle, { backgroundColor: c + "16" }]}>
+          <Feather name={category.icon as any} size={20} color={c} style={{ opacity: 0.9 }} />
+        </View>
 
-          <View style={[styles.iconBox, { backgroundColor: c + "20", borderColor: c + "35" }]}>
-            <Feather name={category.icon as any} size={22} color={c} />
-          </View>
+        {/* Text */}
+        <View style={styles.info}>
+          <Text style={styles.name}>{category.name}</Text>
+          <Text style={styles.count}>
+            {itemCount} {itemCount === 1 ? "video" : "videos"}
+          </Text>
+        </View>
 
-          <View style={styles.info}>
-            <Text style={styles.name}>{category.name}</Text>
-            <Text style={styles.count}>
-              {itemCount} {itemCount === 1 ? "video" : "videos"}
-            </Text>
-          </View>
-
-          <View style={[styles.chevronBox, { backgroundColor: c + "18", borderColor: c + "28" }]}>
-            <Feather name="chevron-right" size={15} color={c} />
-          </View>
-        </LinearGradient>
+        {/* Arrow */}
+        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.18)" />
       </Pressable>
     </Animated.View>
   );
@@ -70,61 +56,39 @@ export function CategoryCard({ category, itemCount, onPress }: CategoryCardProps
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 9,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 8,
+    marginBottom: 8,
   },
   card: {
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 1,
-  },
-  gradient: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    backgroundColor: "#11131F",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#1A1B2E",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 14,
   },
-  leftAccent: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 6,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-  },
-  iconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 15,
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
   info: {
     flex: 1,
     gap: 3,
   },
   name: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: -0.2,
-    color: "#F0F1FF",
+    color: "#FFFFFF",
   },
   count: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "#6B7A9E",
-  },
-  chevronBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
+    color: "#9CA3AF",
   },
 });

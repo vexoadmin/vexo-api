@@ -10,24 +10,14 @@ interface CategoryChipProps {
   onPress: () => void;
 }
 
-export function CategoryChip({ label, color, selected, onPress }: CategoryChipProps) {
+export function CategoryChip({ label, selected, onPress }: CategoryChipProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
   function handlePressIn() {
-    Animated.spring(scale, {
-      toValue: 0.91,
-      useNativeDriver: true,
-      speed: 55,
-      bounciness: 1,
-    }).start();
+    Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 55, bounciness: 0 }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 38,
-      bounciness: 10,
-    }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 8 }).start();
   }
   function handlePress() {
     Haptics.selectionAsync();
@@ -36,21 +26,16 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
 
   if (selected) {
     return (
-      <Animated.View
-        style={[
-          styles.glowWrap,
-          { transform: [{ scale }], shadowColor: "#784BEA" },
-        ]}
-      >
+      <Animated.View style={[styles.glowWrap, { transform: [{ scale }] }]}>
         <Pressable
           onPress={handlePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           style={{ borderRadius: 20 }}
         >
           <LinearGradient
-            colors={["#6466EF", "#784BEA", "#A56BF7"]}
+            colors={["#7C5CFF", "#4CC9F0"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.selectedPill}
@@ -68,7 +53,7 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         style={styles.pill}
       >
         <Text style={styles.pillText}>{label}</Text>
@@ -79,13 +64,14 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
 
 const styles = StyleSheet.create({
   glowWrap: {
+    shadowColor: "#7C5CFF",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
+    shadowOpacity: 0.5,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 5,
   },
   selectedPill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
   },
@@ -93,20 +79,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
-    letterSpacing: 0.15,
+    letterSpacing: 0.1,
   },
   pill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: "#0C0E1E",
+    backgroundColor: "#11131F",
     borderWidth: 1,
-    borderColor: "#1A1E35",
+    borderColor: "#1A1B2E",
   },
   pillText: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "#3D4666",
+    color: "#4A5170",
     letterSpacing: 0.1,
   },
 });

@@ -16,13 +16,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CategoryCard } from "@/components/CategoryCard";
 import { useSavedItems } from "@/contexts/SavedItemsContext";
-import { useColors } from "@/hooks/useColors";
 
-const CATEGORY_COLORS = ["#784BEA", "#6466EF", "#A56BF7", "#FA7DBA", "#2C6FD8", "#10B981", "#F59E0B", "#EF4444"];
-const CATEGORY_ICONS = ["folder", "heart", "star", "film", "coffee", "globe", "zap", "activity"];
+const BG = "#0B0B12";
+const SURFACE = "#11131F";
+const BORDER = "#1A1B2E";
+
+const CATEGORY_COLORS = [
+  "#7C5CFF", "#4CC9F0", "#A78BFA", "#F472B6",
+  "#34D399", "#FBBF24", "#60A5FA", "#F87171",
+];
+const CATEGORY_ICONS = [
+  "folder", "heart", "star", "film",
+  "coffee", "globe", "zap", "activity",
+];
 
 export default function CategoriesScreen() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { categories, items, addCategory } = useSavedItems();
@@ -55,32 +63,31 @@ export default function CategoriesScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <FlatList
         data={categories}
         keyExtractor={(c) => c.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: topPadding + 8, paddingBottom: bottomPadding },
+          { paddingTop: topPadding + 14, paddingBottom: bottomPadding },
         ]}
         ListHeaderComponent={
           <>
-            <View style={styles.headerGlow}>
+            {/* Header */}
+            <View style={styles.headerWrap}>
               <LinearGradient
-                colors={["#784BEA14", "#6466EF08", "transparent"]}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
+                colors={["#7C5CFF14", "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
                 pointerEvents="none"
               />
               <View style={styles.headerRow}>
                 <View>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.titleMain}>Collections</Text>
-                  </View>
-                  <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                    {categories.length} {categories.length === 1 ? "category" : "categories"}
+                  <Text style={styles.title}>Collections</Text>
+                  <Text style={styles.subtitle}>
+                    {categories.length} {categories.length === 1 ? "collection" : "collections"}
                   </Text>
                 </View>
                 <Pressable
@@ -88,35 +95,31 @@ export default function CategoriesScreen() {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setShowAdd(!showAdd);
                   }}
-                  style={[
-                    styles.addBtn,
-                    showAdd
-                      ? { backgroundColor: "#784BEA25", borderColor: "#784BEA55" }
-                      : { backgroundColor: colors.secondary, borderColor: colors.border },
-                  ]}
+                  style={[styles.addBtn, showAdd && styles.addBtnActive]}
                 >
-                  <Feather name={showAdd ? "x" : "plus"} size={19} color={showAdd ? "#A56BF7" : colors.mutedForeground} />
+                  <Feather
+                    name={showAdd ? "x" : "plus"}
+                    size={18}
+                    color={showAdd ? "#7C5CFF" : "#9CA3AF"}
+                  />
                 </Pressable>
               </View>
             </View>
 
+            {/* Add form */}
             {showAdd && (
-              <View style={[styles.addForm, { backgroundColor: colors.card, borderColor: "#784BEA28" }]}>
-                <LinearGradient
-                  colors={["#784BEA10", "transparent"]}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
+              <View style={styles.addForm}>
                 <TextInput
                   value={newName}
                   onChangeText={setNewName}
                   placeholder="Collection name..."
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[styles.input, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
+                  placeholderTextColor="#4A5170"
+                  style={styles.formInput}
                   autoFocus
                 />
-                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>COLOR</Text>
-                <View style={styles.optionsRow}>
+
+                <Text style={styles.formLabel}>COLOR</Text>
+                <View style={styles.swatchRow}>
                   {CATEGORY_COLORS.map((c, i) => (
                     <Pressable
                       key={c}
@@ -124,7 +127,7 @@ export default function CategoriesScreen() {
                       style={[
                         styles.colorSwatch,
                         { backgroundColor: c },
-                        selectedColor === i && { borderWidth: 2.5, borderColor: "#fff" },
+                        selectedColor === i && styles.swatchSelected,
                       ]}
                     >
                       {selectedColor === i && (
@@ -133,45 +136,48 @@ export default function CategoriesScreen() {
                     </Pressable>
                   ))}
                 </View>
-                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>ICON</Text>
-                <View style={styles.optionsRow}>
+
+                <Text style={styles.formLabel}>ICON</Text>
+                <View style={styles.swatchRow}>
                   {CATEGORY_ICONS.map((icon, i) => (
                     <Pressable
                       key={icon}
                       onPress={() => setSelectedIcon(i)}
                       style={[
                         styles.iconSwatch,
-                        {
-                          backgroundColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "22" : colors.secondary,
-                          borderColor: selectedIcon === i ? CATEGORY_COLORS[selectedColor] + "70" : colors.border,
+                        selectedIcon === i && {
+                          backgroundColor: CATEGORY_COLORS[selectedColor] + "20",
+                          borderColor: CATEGORY_COLORS[selectedColor] + "60",
                         },
                       ]}
                     >
                       <Feather
                         name={icon as any}
-                        size={17}
-                        color={selectedIcon === i ? CATEGORY_COLORS[selectedColor] : colors.mutedForeground}
+                        size={16}
+                        color={selectedIcon === i ? CATEGORY_COLORS[selectedColor] : "#4A5170"}
                       />
                     </Pressable>
                   ))}
                 </View>
-                <Pressable onPress={handleAdd} style={{ borderRadius: 14, overflow: "hidden", marginTop: 4 }}>
+
+                <Pressable
+                  onPress={handleAdd}
+                  style={{ borderRadius: 14, overflow: "hidden", marginTop: 4 }}
+                >
                   <LinearGradient
-                    colors={["#6466EF", "#784BEA", "#A56BF7"]}
+                    colors={["#7C5CFF", "#4CC9F0"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={styles.saveBtn}
+                    style={styles.createBtn}
                   >
-                    <Feather name="plus" size={16} color="#fff" />
-                    <Text style={styles.saveBtnText}>Create Collection</Text>
+                    <Feather name="plus" size={15} color="#fff" />
+                    <Text style={styles.createBtnText}>Create Collection</Text>
                   </LinearGradient>
                 </Pressable>
               </View>
             )}
 
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              ALL COLLECTIONS
-            </Text>
+            <Text style={styles.sectionLabel}>ALL COLLECTIONS</Text>
           </>
         }
         renderItem={({ item: category }) => (
@@ -182,17 +188,12 @@ export default function CategoriesScreen() {
           />
         )}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <LinearGradient
-              colors={["#784BEA20", "#6466EF10"]}
-              style={styles.emptyIconRing}
-            >
-              <Feather name="folder" size={36} color="#A56BF7" style={{ opacity: 0.8 }} />
-            </LinearGradient>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No collections yet</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Tap + to create your first collection
-            </Text>
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIcon}>
+              <Feather name="folder" size={32} color="#7C5CFF" style={{ opacity: 0.7 }} />
+            </View>
+            <Text style={styles.emptyTitle}>No collections yet</Text>
+            <Text style={styles.emptyDesc}>Tap + to create your first collection</Text>
           </View>
         }
       />
@@ -201,111 +202,135 @@ export default function CategoriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { paddingHorizontal: 16 },
-  headerGlow: {
+  container: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  content: {
+    paddingHorizontal: 20,
+  },
+
+  headerWrap: {
     overflow: "hidden",
-    marginBottom: 20,
-    paddingBottom: 4,
+    marginBottom: 24,
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-  },
-  titleMain: {
-    fontSize: 28,
+  title: {
+    fontSize: 32,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -1,
-    color: "#F0F1FF",
+    letterSpacing: -1.4,
+    color: "#FFFFFF",
   },
   subtitle: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    marginTop: 2,
+    color: "#2E3350",
+    marginTop: 4,
   },
   addBtn: {
     width: 42,
     height: 42,
     borderRadius: 14,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
+  addBtnActive: {
+    backgroundColor: "#7C5CFF18",
+    borderColor: "#7C5CFF40",
+  },
+
   addForm: {
-    padding: 16,
-    borderRadius: 18,
-    marginBottom: 16,
+    backgroundColor: SURFACE,
+    borderRadius: 20,
     borderWidth: 1,
-    gap: 10,
-    overflow: "hidden",
+    borderColor: BORDER,
+    padding: 20,
+    marginBottom: 20,
+    gap: 12,
   },
-  input: {
+  formInput: {
+    backgroundColor: "#0E1020",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    borderRadius: 12,
-    borderWidth: 1,
+    color: "#FFFFFF",
   },
   formLabel: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.9,
-    marginTop: 2,
+    letterSpacing: 1,
+    color: "#4A5170",
+    marginTop: 4,
   },
-  optionsRow: {
+  swatchRow: {
     flexDirection: "row",
-    gap: 8,
     flexWrap: "wrap",
+    gap: 8,
   },
   colorSwatch: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  swatchSelected: {
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   iconSwatch: {
     width: 42,
     height: 42,
     borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#0E1020",
     borderWidth: 1,
-  },
-  saveBtn: {
-    paddingVertical: 14,
+    borderColor: BORDER,
     alignItems: "center",
     justifyContent: "center",
+  },
+  createBtn: {
+    paddingVertical: 14,
     borderRadius: 14,
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
   },
-  saveBtnText: {
+  createBtnText: {
     color: "#fff",
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
+
   sectionLabel: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 1.2,
+    color: "#2A2E45",
     marginBottom: 12,
   },
-  emptyState: {
+
+  emptyWrap: {
     alignItems: "center",
     paddingTop: 60,
     gap: 12,
   },
-  emptyIconRing: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+  emptyIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "#7C5CFF14",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
@@ -313,10 +338,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
+    color: "#FFFFFF",
   },
-  emptyText: {
+  emptyDesc: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
     textAlign: "center",
   },
 });
