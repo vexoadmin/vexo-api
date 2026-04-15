@@ -1,9 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-
-import { useColors } from "@/hooks/useColors";
+import { Animated, Pressable, StyleSheet, Text } from "react-native";
 
 interface CategoryChipProps {
   label: string;
@@ -13,15 +11,23 @@ interface CategoryChipProps {
 }
 
 export function CategoryChip({ label, color, selected, onPress }: CategoryChipProps) {
-  const colors = useColors();
   const scale = useRef(new Animated.Value(1)).current;
-  const chipColor = color || "#784BEA";
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.90, useNativeDriver: true, speed: 55, bounciness: 2 }).start();
+    Animated.spring(scale, {
+      toValue: 0.91,
+      useNativeDriver: true,
+      speed: 55,
+      bounciness: 1,
+    }).start();
   }
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 36, bounciness: 12 }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 38,
+      bounciness: 10,
+    }).start();
   }
   function handlePress() {
     Haptics.selectionAsync();
@@ -30,13 +36,18 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
 
   if (selected) {
     return (
-      <Animated.View style={[styles.glowWrap, { transform: [{ scale }], shadowColor: chipColor }]}>
+      <Animated.View
+        style={[
+          styles.glowWrap,
+          { transform: [{ scale }], shadowColor: "#784BEA" },
+        ]}
+      >
         <Pressable
           onPress={handlePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-          style={{ borderRadius: 22 }}
+          hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+          style={{ borderRadius: 20 }}
         >
           <LinearGradient
             colors={["#6466EF", "#784BEA", "#A56BF7"]}
@@ -44,7 +55,6 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
             end={{ x: 1, y: 0 }}
             style={styles.selectedPill}
           >
-            <View style={styles.activeDot} />
             <Text style={styles.selectedText}>{label}</Text>
           </LinearGradient>
         </Pressable>
@@ -58,10 +68,10 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-        style={[styles.pill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+        hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+        style={styles.pill}
       >
-        <Text style={[styles.pillText, { color: colors.mutedForeground }]}>{label}</Text>
+        <Text style={styles.pillText}>{label}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -69,40 +79,34 @@ export function CategoryChip({ label, color, selected, onPress }: CategoryChipPr
 
 const styles = StyleSheet.create({
   glowWrap: {
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.65,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    elevation: 6,
   },
   selectedPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 22,
-    gap: 6,
-  },
-  activeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.8)",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
   },
   selectedText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
-    letterSpacing: 0.1,
+    letterSpacing: 0.15,
   },
   pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#0C0E1E",
     borderWidth: 1,
+    borderColor: "#1A1E35",
   },
   pillText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#3D4666",
     letterSpacing: 0.1,
   },
 });
