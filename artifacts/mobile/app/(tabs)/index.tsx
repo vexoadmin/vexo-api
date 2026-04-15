@@ -110,9 +110,20 @@ export default function HomeScreen() {
                 pointerEvents="none"
               />
 
-              {/* Top row: logo + search icon */}
+              {/* Title row: "Vexo Save" left, logo right */}
               <View style={styles.headerTop}>
-                <VexoLogo height={28} />
+                <View style={styles.headerLeft}>
+                  <Text style={styles.mainTitle}>
+                    <Text style={styles.titleWhite}>Vexo</Text>
+                    <Text style={styles.titleAccent}> Save</Text>
+                  </Text>
+                </View>
+                <VexoLogo height={64} />
+              </View>
+
+              {/* Tagline + search icon */}
+              <View style={styles.headerBottom}>
+                <Text style={styles.tagline}>Save. Organize. Find.</Text>
                 <Pressable
                   onPress={searchOpen ? closeSearch : openSearch}
                   style={[styles.searchIconBtn, searchOpen && styles.searchIconBtnActive]}
@@ -124,12 +135,6 @@ export default function HomeScreen() {
                     color={searchOpen ? "#7C5CFF" : "#9CA3AF"}
                   />
                 </Pressable>
-              </View>
-
-              {/* Title block */}
-              <View style={styles.titleBlock}>
-                <Text style={styles.welcomeText}>Welcome back</Text>
-                <Text style={styles.mainTitle}>Your Library</Text>
               </View>
 
               {/* Collapsible search bar */}
@@ -346,9 +351,37 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 0,
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  headerBottom: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 18,
+    marginTop: 8,
+  },
+  mainTitle: {
+    fontSize: 36,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -1.8,
+    includeFontPadding: false,
+  },
+  titleWhite: {
+    color: "#FFFFFF",
+  },
+  titleAccent: {
+    color: "#7C5CFF",
+  },
+  tagline: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#3A3F5C",
+    letterSpacing: 0.2,
   },
   searchIconBtn: {
     width: 38,
@@ -363,23 +396,6 @@ const styles = StyleSheet.create({
   searchIconBtnActive: {
     backgroundColor: "#7C5CFF14",
     borderColor: "#7C5CFF40",
-  },
-
-  titleBlock: {
-    gap: 2,
-    marginBottom: 4,
-  },
-  welcomeText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#4A5170",
-    letterSpacing: 0.2,
-  },
-  mainTitle: {
-    fontSize: 34,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -1.6,
-    color: "#FFFFFF",
   },
 
   searchWrap: {
