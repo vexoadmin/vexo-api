@@ -94,7 +94,7 @@ export default function HomeScreen() {
                   </View>
                   <Text style={styles.tagline}>Save. Organize. Find.</Text>
                 </View>
-                <VexoLogo height={50} />
+                <VexoLogo height={72} />
               </View>
 
               <View style={styles.searchWrap}>
