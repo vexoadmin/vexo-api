@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CategoryChip } from "@/components/CategoryChip";
 import { FloatingAddButton } from "@/components/FloatingAddButton";
-import { VexoLogo } from "@/components/VexoLogo";
+
 import { VideoCard } from "@/components/VideoCard";
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 
@@ -102,20 +102,12 @@ export default function HomeScreen() {
           <View>
             {/* ── Header ── */}
             <View style={[styles.header, { paddingTop: topPadding + 14 }]}>
-              {/* Title row: "Vexo Save" left, logo right */}
+              {/* Title + search icon */}
               <View style={styles.headerTop}>
-                <View style={styles.headerLeft}>
-                  <Text style={styles.mainTitle}>
-                    <Text style={styles.titleWhite}>Vexo</Text>
-                    <Text style={styles.titleAccent}> Save</Text>
-                  </Text>
-                </View>
-                <VexoLogo height={64} />
-              </View>
-
-              {/* Tagline + search icon */}
-              <View style={styles.headerBottom}>
-                <Text style={styles.tagline}>Save. Organize. Find.</Text>
+                <Text style={styles.mainTitle}>
+                  <Text style={styles.titleWhite}>Vexo</Text>
+                  <Text style={styles.titleAccent}> Save</Text>
+                </Text>
                 <Pressable
                   onPress={searchOpen ? closeSearch : openSearch}
                   style={[styles.searchIconBtn, searchOpen && styles.searchIconBtnActive]}
@@ -124,10 +116,13 @@ export default function HomeScreen() {
                   <Feather
                     name={searchOpen ? "x" : "search"}
                     size={17}
-                    color={searchOpen ? "#A5F3FC" : "rgba(255,255,255,0.80)"}
+                    color={searchOpen ? "#A5F3FC" : "rgba(255,255,255,0.65)"}
                   />
                 </Pressable>
               </View>
+
+              {/* Tagline */}
+              <Text style={styles.tagline}>Save. Organize. Find.</Text>
 
               {/* Collapsible search bar */}
               <Animated.View style={[styles.searchWrap, { height: searchBarHeight, opacity: searchBarOpacity }]}>
@@ -328,24 +323,13 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginBottom: 0,
-  },
-  headerLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  headerBottom: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 8,
   },
   mainTitle: {
-    fontSize: 36,
+    fontSize: 38,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -1.8,
+    letterSpacing: -2,
     includeFontPadding: false,
   },
   titleWhite: { color: "#FFFFFF" },
@@ -353,8 +337,9 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.1,
+    color: "rgba(255,255,255,0.38)",
+    letterSpacing: 0.3,
+    marginTop: 5,
   },
   searchIconBtn: {
     width: 44,
