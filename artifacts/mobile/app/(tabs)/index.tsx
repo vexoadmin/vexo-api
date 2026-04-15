@@ -80,7 +80,7 @@ export default function HomeScreen() {
                     {items.length} {items.length === 1 ? "video" : "videos"} in your library
                   </Text>
                 </View>
-                <VexoLogo size={46} />
+                <VexoLogo width={120} height={42} />
               </View>
 
               <View style={styles.searchWrap}>
