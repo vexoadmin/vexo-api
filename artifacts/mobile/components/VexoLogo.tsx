@@ -1,33 +1,43 @@
 import React from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, Platform, StyleSheet, View } from "react-native";
 
 interface VexoLogoProps {
-  width?: number;
   height?: number;
 }
 
-export function VexoLogo({ width = 120, height = 42 }: VexoLogoProps) {
+// Vexo logo using the transparency-stripped PNG.
+// The ~2.75:1 aspect ratio (logo is wide, not square).
+export function VexoLogo({ height = 36 }: VexoLogoProps) {
+  const width = Math.round(height * 2.75);
+
   return (
-    <View style={[styles.wrapper, { width, height }]}>
+    <View
+      style={[
+        styles.wrap,
+        { width, height },
+        // Native shadow — does NOT create a box artifact on mobile
+        Platform.OS !== "web" && {
+          shadowColor: "#9B7EFA",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.7,
+          shadowRadius: 12,
+          elevation: 0,
+        },
+      ]}
+    >
       <Image
-        source={require("../assets/vexo-logo.png")}
+        source={require("../assets/vexo-logo-transparent.png")}
         style={styles.image}
         resizeMode="contain"
+        fadeDuration={0}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    overflow: "hidden",
-    borderRadius: 12,
-    backgroundColor: "#060914",
-    shadowColor: "#784BEA",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
+  wrap: {
+    backgroundColor: "transparent",
   },
   image: {
     width: "100%",
