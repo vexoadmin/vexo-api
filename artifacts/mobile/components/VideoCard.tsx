@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { SavedItem } from "@/contexts/SavedItemsContext";
@@ -13,10 +13,10 @@ const PLATFORM_ICONS: Record<string, string> = {
   instagram: "instagram",
 };
 
-const PLATFORM_LABELS: Record<string, string> = {
-  youtube: "YouTube",
-  tiktok: "TikTok",
-  instagram: "Instagram",
+const PLATFORM_COLORS: Record<string, string> = {
+  youtube: "#FF0000",
+  tiktok: "#ffffff",
+  instagram: "#E1306C",
 };
 
 interface VideoCardProps {
@@ -27,7 +27,26 @@ interface VideoCardProps {
 
 export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   const colors = useColors();
-  const height = isLarge ? 220 : 160;
+  const scale = useRef(new Animated.Value(1)).current;
+  const height = isLarge ? 190 : 140;
+
+  function handlePressIn() {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 2,
+    }).start();
+  }
+
+  function handlePressOut() {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 6,
+    }).start();
+  }
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -35,123 +54,141 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   }
 
   return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [
-        styles.container,
-        {
-          borderRadius: 16,
-          backgroundColor: colors.card,
-          opacity: pressed ? 0.85 : 1,
-          transform: [{ scale: pressed ? 0.97 : 1 }],
-        },
-      ]}
-    >
-      <LinearGradient
-        colors={[item.thumbnailColor, item.thumbnailColor + "88", colors.card]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.thumbnail, { height, borderRadius: 16 }]}
+    <Animated.View style={[styles.container, { transform: [{ scale }] }]}>
+      <Pressable
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[styles.card, { backgroundColor: colors.card }]}
       >
-        <View style={styles.platformBadge}>
-          <Feather
-            name={PLATFORM_ICONS[item.platform] as any}
-            size={12}
-            color="#fff"
-          />
-          <Text style={styles.platformText}>
-            {PLATFORM_LABELS[item.platform]}
-          </Text>
-        </View>
-        <View style={styles.playContainer}>
-          <View style={styles.playButton}>
-            <Feather name="play" size={20} color="#fff" />
+        <LinearGradient
+          colors={[item.thumbnailColor + "EE", item.thumbnailColor + "99", item.thumbnailColor + "44"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.thumbnail, { height }]}
+        >
+          <View style={styles.topRow}>
+            <View style={[styles.platformBadge, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
+              <Feather
+                name={PLATFORM_ICONS[item.platform] as any}
+                size={10}
+                color={PLATFORM_COLORS[item.platform]}
+              />
+            </View>
+            {item.reminder && item.reminder > Date.now() && (
+              <View style={[styles.reminderDot, { backgroundColor: "#F59E0B" }]} />
+            )}
           </View>
-        </View>
-      </LinearGradient>
-      <View style={styles.info}>
-        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.notes ? (
-          <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {item.notes}
+          <View style={styles.playWrap}>
+            <View style={styles.playButton}>
+              <Feather name="play" size={16} color="#fff" />
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.info}>
+          <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
+            {item.title}
           </Text>
-        ) : null}
-        <View style={styles.categoryRow}>
-          <View style={[styles.categoryBadge, { backgroundColor: item.thumbnailColor + "22" }]}>
-            <Text style={[styles.categoryText, { color: item.thumbnailColor }]}>
-              {item.category}
+          {item.notes ? (
+            <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {item.notes}
             </Text>
+          ) : null}
+          <View style={styles.footer}>
+            <View style={[styles.categoryPill, { backgroundColor: item.thumbnailColor + "20" }]}>
+              <View style={[styles.dot, { backgroundColor: item.thumbnailColor }]} />
+              <Text style={[styles.categoryText, { color: item.thumbnailColor }]}>
+                {item.category}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  card: {
+    borderRadius: 14,
     overflow: "hidden",
   },
   thumbnail: {
     justifyContent: "space-between",
-    padding: 12,
+    padding: 10,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   platformBadge: {
-    flexDirection: "row",
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    justifyContent: "center",
   },
-  platformText: {
-    color: "#fff",
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
+  reminderDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  playContainer: {
+  playWrap: {
     alignItems: "center",
     justifyContent: "center",
     flex: 1,
   },
   playButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.22)",
     alignItems: "center",
     justifyContent: "center",
-    paddingLeft: 3,
+    paddingLeft: 2,
   },
   info: {
-    padding: 12,
-    gap: 4,
+    paddingHorizontal: 11,
+    paddingTop: 9,
+    paddingBottom: 11,
+    gap: 3,
   },
   title: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    lineHeight: 20,
+    lineHeight: 18,
+    letterSpacing: -0.1,
   },
   notes: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
+    lineHeight: 15,
   },
-  categoryRow: {
+  footer: {
     flexDirection: "row",
-    marginTop: 4,
+    marginTop: 5,
   },
-  categoryBadge: {
-    paddingHorizontal: 8,
+  categoryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 6,
+    gap: 4,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
   },
   categoryText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.1,
   },
 });

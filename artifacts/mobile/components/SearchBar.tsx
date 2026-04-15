@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -15,7 +15,7 @@ export function SearchBar({ value, onChangeText, placeholder = "Search saved vid
 
   return (
     <View style={[styles.container, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-      <Feather name="search" size={18} color={colors.mutedForeground} />
+      <Feather name="search" size={16} color={colors.mutedForeground} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -25,12 +25,9 @@ export function SearchBar({ value, onChangeText, placeholder = "Search saved vid
         returnKeyType="search"
       />
       {value.length > 0 && (
-        <Feather
-          name="x"
-          size={18}
-          color={colors.mutedForeground}
-          onPress={() => onChangeText("")}
-        />
+        <Pressable onPress={() => onChangeText("")} hitSlop={8}>
+          <Feather name="x-circle" size={16} color={colors.mutedForeground} />
+        </Pressable>
       )}
     </View>
   );
@@ -41,14 +38,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingVertical: 11,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 10,
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     paddingVertical: 0,
   },

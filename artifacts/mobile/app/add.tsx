@@ -14,13 +14,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 import { useColors } from "@/hooks/useColors";
 
 const GRADIENT_COLORS = [
   "#8B5CF6", "#6366F1", "#3B82F6", "#06B6D4",
-  "#7C3AED", "#2563EB", "#0891B2", "#4F46E5",
+  "#F97316", "#EC4899", "#10B981", "#F59E0B",
 ];
 
 function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null {
@@ -31,6 +32,17 @@ function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null 
   return null;
 }
 
+const REMINDER_OPTIONS = [
+  { label: "Tomorrow", getValue: () => Date.now() + 86400000 },
+  { label: "Weekend", getValue: () => {
+    const now = new Date();
+    const day = now.getDay();
+    const daysUntilSat = (6 - day + 7) % 7 || 7;
+    return Date.now() + daysUntilSat * 86400000;
+  }},
+  { label: "Next Week", getValue: () => Date.now() + 7 * 86400000 },
+];
+
 export default function AddScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -40,23 +52,16 @@ export default function AddScreen() {
   const [title, setTitle] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(categories[0]?.name || "");
   const [notes, setNotes] = useState("");
+  const [reminder, setReminder] = useState<number | undefined>(undefined);
+  const [showCustomDate, setShowCustomDate] = useState(false);
 
   const detectedPlatform = detectPlatform(url);
+  const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 16;
 
   function handleSave() {
-    if (!url.trim()) {
-      Alert.alert("Missing URL", "Please enter a video link");
-      return;
-    }
-    if (!title.trim()) {
-      Alert.alert("Missing Title", "Please enter a title");
-      return;
-    }
-    if (!detectedPlatform) {
-      Alert.alert("Invalid Link", "Please enter a YouTube, TikTok, or Instagram link");
-      return;
-    }
-
+    if (!url.trim()) { Alert.alert("Missing URL", "Please enter a video link"); return; }
+    if (!title.trim()) { Alert.alert("Missing Title", "Please enter a title"); return; }
+    if (!detectedPlatform) { Alert.alert("Invalid Link", "Please enter a YouTube, TikTok, or Instagram link"); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addItem({
       url: url.trim(),
@@ -65,24 +70,26 @@ export default function AddScreen() {
       category: selectedCategory,
       notes: notes.trim(),
       thumbnailColor: GRADIENT_COLORS[Math.floor(Math.random() * GRADIENT_COLORS.length)],
+      reminder,
     });
     router.back();
+  }
+
+  function formatReminder(ts: number) {
+    return new Date(ts).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 20 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Video Link</Text>
-          <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderRadius: 14, borderColor: colors.border, borderWidth: 1 }]}>
-            <Feather name="link" size={18} color={colors.mutedForeground} />
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>VIDEO LINK</Text>
+          <View style={[styles.inputRow, { backgroundColor: colors.secondary, borderColor: detectedPlatform ? "#8B5CF6" + "66" : colors.border }]}>
+            <Feather name="link-2" size={16} color={detectedPlatform ? colors.primary : colors.mutedForeground} />
             <TextInput
               value={url}
               onChangeText={setUrl}
@@ -94,13 +101,13 @@ export default function AddScreen() {
             />
           </View>
           {detectedPlatform && (
-            <View style={[styles.platformDetected, { backgroundColor: colors.primary + "22" }]}>
+            <View style={[styles.detected, { backgroundColor: "#8B5CF6" + "15" }]}>
               <Feather
                 name={detectedPlatform === "youtube" ? "youtube" : detectedPlatform === "instagram" ? "instagram" : "music"}
-                size={14}
+                size={12}
                 color={colors.primary}
               />
-              <Text style={[styles.platformText, { color: colors.primary }]}>
+              <Text style={[styles.detectedText, { color: colors.primary }]}>
                 {detectedPlatform === "youtube" ? "YouTube" : detectedPlatform === "instagram" ? "Instagram" : "TikTok"} detected
               </Text>
             </View>
@@ -108,72 +115,145 @@ export default function AddScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Title</Text>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>TITLE</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="Give it a title"
+            placeholder="Give it a memorable title"
             placeholderTextColor={colors.mutedForeground}
             style={[styles.textInput, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Category</Text>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>CATEGORY</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
             <View style={styles.categoryRow}>
-              {categories.map((cat) => (
-                <Pressable
-                  key={cat.id}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setSelectedCategory(cat.name);
-                  }}
-                  style={[
-                    styles.categoryChip,
-                    {
-                      backgroundColor: selectedCategory === cat.name ? cat.color + "33" : colors.secondary,
-                      borderColor: selectedCategory === cat.name ? cat.color : colors.border,
-                    },
-                  ]}
-                >
-                  <Feather name={cat.icon as any} size={14} color={selectedCategory === cat.name ? cat.color : colors.mutedForeground} />
-                  <Text
+              {categories.map((cat) => {
+                const selected = selectedCategory === cat.name;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setSelectedCategory(cat.name);
+                    }}
                     style={[
-                      styles.chipText,
-                      { color: selectedCategory === cat.name ? cat.color : colors.mutedForeground },
+                      styles.categoryChip,
+                      {
+                        backgroundColor: selected ? cat.color + "22" : colors.secondary,
+                        borderColor: selected ? cat.color + "66" : colors.border,
+                      },
                     ]}
                   >
-                    {cat.name}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Feather name={cat.icon as any} size={13} color={selected ? cat.color : colors.mutedForeground} />
+                    <Text style={[styles.chipText, { color: selected ? cat.color : colors.mutedForeground }]}>
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </ScrollView>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Notes (optional)</Text>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>NOTES</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
-            placeholder="Add your notes..."
+            placeholder="Add notes, timestamps, or thoughts..."
             placeholderTextColor={colors.mutedForeground}
             style={[styles.textArea, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
             multiline
-            numberOfLines={4}
+            numberOfLines={3}
             textAlignVertical="top"
           />
         </View>
 
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>REMINDER</Text>
+          <View style={styles.reminderGrid}>
+            {REMINDER_OPTIONS.map((opt) => {
+              const val = opt.getValue();
+              const active = reminder !== undefined && Math.abs(reminder - val) < 3600000;
+              return (
+                <Pressable
+                  key={opt.label}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setReminder(active ? undefined : val);
+                    setShowCustomDate(false);
+                  }}
+                  style={[
+                    styles.reminderChip,
+                    {
+                      backgroundColor: active ? colors.primary + "22" : colors.secondary,
+                      borderColor: active ? colors.primary + "55" : colors.border,
+                    },
+                  ]}
+                >
+                  <Feather name="clock" size={13} color={active ? colors.primary : colors.mutedForeground} />
+                  <Text style={[styles.reminderText, { color: active ? colors.primary : colors.mutedForeground }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync();
+                setShowCustomDate(!showCustomDate);
+              }}
+              style={[
+                styles.reminderChip,
+                {
+                  backgroundColor: showCustomDate ? colors.accent + "22" : colors.secondary,
+                  borderColor: showCustomDate ? colors.accent + "55" : colors.border,
+                },
+              ]}
+            >
+              <Feather name="calendar" size={13} color={showCustomDate ? colors.accent : colors.mutedForeground} />
+              <Text style={[styles.reminderText, { color: showCustomDate ? colors.accent : colors.mutedForeground }]}>
+                Custom
+              </Text>
+            </Pressable>
+          </View>
+          {reminder && (
+            <View style={[styles.reminderSet, { backgroundColor: "#F59E0B" + "15" }]}>
+              <Feather name="bell" size={13} color="#F59E0B" />
+              <Text style={[styles.reminderSetText, { color: "#F59E0B" }]}>
+                Reminder set for {formatReminder(reminder)}
+              </Text>
+              <Pressable onPress={() => setReminder(undefined)}>
+                <Feather name="x" size={13} color="#F59E0B" />
+              </Pressable>
+            </View>
+          )}
+          {showCustomDate && Platform.OS !== "web" && (
+            <DateTimePicker
+              value={reminder ? new Date(reminder) : new Date(Date.now() + 86400000)}
+              mode="date"
+              minimumDate={new Date()}
+              onChange={(_, date) => {
+                if (date) {
+                  setReminder(date.getTime());
+                  setShowCustomDate(false);
+                }
+              }}
+              themeVariant="dark"
+            />
+          )}
+        </View>
+
         <Pressable onPress={handleSave} style={styles.saveBtn}>
           <LinearGradient
-            colors={["#8B5CF6", "#6366F1", "#06B6D4"]}
+            colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.saveBtnGradient}
           >
-            <Feather name="check" size={20} color="#fff" />
+            <Feather name="bookmark" size={18} color="#fff" />
             <Text style={styles.saveBtnText}>Save Video</Text>
           </LinearGradient>
         </Pressable>
@@ -183,28 +263,18 @@ export default function AddScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 20,
-  },
-  section: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    marginLeft: 4,
-  },
+  container: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingTop: 20, gap: 22 },
+  section: { gap: 8 },
+  label: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     gap: 10,
+    borderRadius: 13,
+    borderWidth: 1,
   },
   input: {
     flex: 1,
@@ -214,60 +284,64 @@ const styles = StyleSheet.create({
   },
   textInput: {
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    borderRadius: 14,
+    borderRadius: 13,
     borderWidth: 1,
   },
   textArea: {
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingVertical: 13,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
-    borderRadius: 14,
+    borderRadius: 13,
     borderWidth: 1,
-    minHeight: 100,
+    minHeight: 90,
   },
-  platformDetected: {
+  detected: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 10,
-    gap: 6,
+    borderRadius: 8,
+    gap: 5,
   },
-  platformText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  categoryScroll: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  categoryRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  detectedText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  categoryScroll: { marginHorizontal: -16 },
+  categoryRow: { flexDirection: "row", gap: 7, paddingHorizontal: 16 },
   categoryChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     gap: 6,
   },
-  chipText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
+  chipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  reminderGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  reminderChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
   },
-  saveBtn: {
-    borderRadius: 14,
-    overflow: "hidden",
-    marginTop: 8,
+  reminderText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  reminderSet: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 7,
   },
+  reminderSetText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
+  saveBtn: { borderRadius: 14, overflow: "hidden" },
   saveBtnGradient: {
     flexDirection: "row",
     alignItems: "center",
@@ -276,9 +350,5 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
   },
-  saveBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
+  saveBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
 });

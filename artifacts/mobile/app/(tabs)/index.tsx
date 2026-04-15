@@ -1,16 +1,18 @@
-import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
+  Animated,
   FlatList,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CategoryChip } from "@/components/CategoryChip";
 import { FloatingAddButton } from "@/components/FloatingAddButton";
 import { SearchBar } from "@/components/SearchBar";
 import { VideoCard } from "@/components/VideoCard";
@@ -21,69 +23,88 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { items, searchItems } = useSavedItems();
+  const { items, categories, searchItems } = useSavedItems();
   const [searchQuery, setSearchQuery] = useState("");
-
-  const displayedItems = useMemo(() => {
-    if (searchQuery.trim()) return searchItems(searchQuery);
-    return items;
-  }, [items, searchQuery, searchItems]);
-
-  const leftColumn = useMemo(
-    () => displayedItems.filter((_, i) => i % 2 === 0),
-    [displayedItems]
-  );
-  const rightColumn = useMemo(
-    () => displayedItems.filter((_, i) => i % 2 === 1),
-    [displayedItems]
-  );
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPadding = Platform.OS === "web" ? 84 + 34 : insets.bottom + 90;
+
+  const displayedItems = useMemo(() => {
+    let list = searchQuery.trim() ? searchItems(searchQuery) : items;
+    if (selectedCategory !== "All") {
+      list = list.filter((i) => i.category === selectedCategory);
+    }
+    return list;
+  }, [items, searchQuery, selectedCategory, searchItems]);
+
+  const leftColumn = useMemo(() => displayedItems.filter((_, i) => i % 2 === 0), [displayedItems]);
+  const rightColumn = useMemo(() => displayedItems.filter((_, i) => i % 2 === 1), [displayedItems]);
+
+  const categoryList = useMemo(() => ["All", ...categories.map((c) => c.name)], [categories]);
+  const categoryColorMap = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.name, c.color])),
+    [categories]
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={[1]}
-        keyExtractor={() => "grid"}
+        keyExtractor={() => "content"}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: topPadding + 12,
-            paddingBottom: Platform.OS === "web" ? 84 + 34 : insets.bottom + 100,
-          },
-        ]}
-        renderItem={() => (
-          <>
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
+        ListHeaderComponent={
+          <View style={{ paddingTop: topPadding + 8 }}>
             <View style={styles.header}>
-              <LinearGradient
-                colors={["#8B5CF6", "#06B6D4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.logoGradient}
-              >
-                <Feather name="bookmark" size={20} color="#fff" />
-              </LinearGradient>
               <View>
                 <Text style={[styles.appName, { color: colors.foreground }]}>Vexo Save</Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
                   {items.length} videos saved
                 </Text>
               </View>
+              <LinearGradient
+                colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.logoGradient}
+              >
+                <Text style={styles.logoLetter}>V</Text>
+              </LinearGradient>
             </View>
 
-            <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+            <View style={styles.searchWrap}>
+              <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+            </View>
 
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+              style={styles.chipsScroll}
+            >
+              {categoryList.map((name) => (
+                <CategoryChip
+                  key={name}
+                  label={name}
+                  color={name === "All" ? colors.primary : categoryColorMap[name]}
+                  selected={selectedCategory === name}
+                  onPress={() => setSelectedCategory(name)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        }
+        renderItem={() => (
+          <View style={styles.gridWrap}>
             {displayedItems.length === 0 ? (
               <View style={styles.emptyState}>
-                <Feather name="inbox" size={48} color={colors.mutedForeground} />
+                <Text style={[styles.emptyIcon, { color: colors.mutedForeground }]}>—</Text>
                 <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                  {searchQuery ? "No results found" : "No saved videos yet"}
+                  {searchQuery ? "No results" : `No ${selectedCategory === "All" ? "saved videos" : selectedCategory + " videos"} yet`}
                 </Text>
                 <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                  {searchQuery
-                    ? "Try a different search term"
-                    : "Tap the + button to save your first video"}
+                  {searchQuery ? "Try a different search term" : "Tap + to save your first video"}
                 </Text>
               </View>
             ) : (
@@ -110,10 +131,13 @@ export default function HomeScreen() {
                 </View>
               </View>
             )}
-          </>
+          </View>
         )}
       />
-      <FloatingAddButton onPress={() => router.push("/add")} />
+      <FloatingAddButton
+        onPress={() => router.push("/add")}
+        bottomOffset={bottomPadding - 40}
+      />
     </View>
   );
 }
@@ -122,49 +146,73 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginBottom: 14,
   },
   logoGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
-  appName: {
-    fontSize: 24,
+  logoLetter: {
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+  appName: {
+    fontSize: 26,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.8,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
+    marginTop: 1,
+  },
+  searchWrap: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  chipsScroll: {
+    marginBottom: 14,
+  },
+  chipsRow: {
+    paddingHorizontal: 16,
+    gap: 7,
+    flexDirection: "row",
+  },
+  gridWrap: {
+    paddingHorizontal: 16,
   },
   grid: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
   },
   column: {
     flex: 1,
   },
   emptyState: {
     alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 80,
-    gap: 12,
+    paddingTop: 70,
+    gap: 8,
+  },
+  emptyIcon: {
+    fontSize: 32,
+    fontFamily: "Inter_700Bold",
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
   },

@@ -10,6 +10,7 @@ export interface SavedItem {
   notes: string;
   thumbnailColor: string;
   createdAt: number;
+  reminder?: number;
 }
 
 export interface Category {
@@ -32,109 +33,126 @@ interface SavedItemsContextType {
 
 const SavedItemsContext = createContext<SavedItemsContextType | null>(null);
 
-const ITEMS_KEY = "@vexo_items";
-const CATEGORIES_KEY = "@vexo_categories";
+const ITEMS_KEY = "@vexo_items_v2";
+const CATEGORIES_KEY = "@vexo_categories_v2";
 
-const GRADIENT_COLORS = [
-  "#8B5CF6",
-  "#6366F1",
-  "#3B82F6",
-  "#06B6D4",
-  "#7C3AED",
-  "#2563EB",
-  "#0891B2",
-  "#4F46E5",
+export const DEFAULT_CATEGORIES: Category[] = [
+  { id: "1", name: "Recipes", color: "#F97316", icon: "coffee" },
+  { id: "2", name: "Kids", color: "#EC4899", icon: "star" },
+  { id: "3", name: "Travel", color: "#06B6D4", icon: "globe" },
+  { id: "4", name: "Learning", color: "#8B5CF6", icon: "book-open" },
+  { id: "5", name: "Inspiration", color: "#F59E0B", icon: "zap" },
+  { id: "6", name: "Tips", color: "#10B981", icon: "check-circle" },
+  { id: "7", name: "Music", color: "#3B82F6", icon: "music" },
+  { id: "8", name: "Fitness", color: "#EF4444", icon: "activity" },
+  { id: "9", name: "Tech", color: "#6366F1", icon: "cpu" },
 ];
 
-const DEFAULT_CATEGORIES: Category[] = [
-  { id: "1", name: "Tutorials", color: "#8B5CF6", icon: "book-open" },
-  { id: "2", name: "Music", color: "#3B82F6", icon: "music" },
-  { id: "3", name: "Cooking", color: "#06B6D4", icon: "coffee" },
-  { id: "4", name: "Fitness", color: "#7C3AED", icon: "activity" },
-  { id: "5", name: "Comedy", color: "#6366F1", icon: "smile" },
-  { id: "6", name: "Tech", color: "#2563EB", icon: "cpu" },
-];
+const tomorrow = Date.now() + 86400000;
+const nextWeek = Date.now() + 604800000;
 
 const SAMPLE_ITEMS: SavedItem[] = [
   {
     id: "s1",
     url: "https://youtube.com/watch?v=abc123",
-    title: "Learn React Native in 2024",
+    title: "5-minute Pasta Carbonara recipe",
     platform: "youtube",
-    category: "Tutorials",
-    notes: "Great beginner tutorial",
-    thumbnailColor: "#8B5CF6",
+    category: "Recipes",
+    notes: "Use pancetta not bacon",
+    thumbnailColor: "#F97316",
     createdAt: Date.now() - 86400000,
+    reminder: tomorrow,
   },
   {
     id: "s2",
     url: "https://tiktok.com/@user/video/123",
-    title: "Quick pasta recipe",
+    title: "Best Bali travel spots 2024",
     platform: "tiktok",
-    category: "Cooking",
-    notes: "Try this weekend",
+    category: "Travel",
+    notes: "Book rice terraces sunrise tour",
     thumbnailColor: "#06B6D4",
     createdAt: Date.now() - 172800000,
   },
   {
     id: "s3",
     url: "https://instagram.com/reel/xyz",
-    title: "Morning workout routine",
+    title: "Morning yoga for kids — 10 mins",
     platform: "instagram",
-    category: "Fitness",
-    notes: "15 min routine, no equipment needed",
-    thumbnailColor: "#7C3AED",
+    category: "Kids",
+    notes: "Perfect for school mornings",
+    thumbnailColor: "#EC4899",
     createdAt: Date.now() - 259200000,
+    reminder: nextWeek,
   },
   {
     id: "s4",
     url: "https://youtube.com/watch?v=def456",
-    title: "Lo-fi beats to study to",
+    title: "How to learn anything 10x faster",
     platform: "youtube",
-    category: "Music",
-    notes: "",
-    thumbnailColor: "#3B82F6",
+    category: "Learning",
+    notes: "The Feynman technique section is gold",
+    thumbnailColor: "#8B5CF6",
     createdAt: Date.now() - 345600000,
   },
   {
     id: "s5",
-    url: "https://tiktok.com/@comedian/video/789",
-    title: "Hilarious cat compilation",
+    url: "https://tiktok.com/@inspire/video/789",
+    title: "Daily habits of highly creative people",
     platform: "tiktok",
-    category: "Comedy",
-    notes: "So funny, watch again",
-    thumbnailColor: "#6366F1",
+    category: "Inspiration",
+    notes: "Start a morning pages journal",
+    thumbnailColor: "#F59E0B",
     createdAt: Date.now() - 432000000,
   },
   {
     id: "s6",
     url: "https://youtube.com/watch?v=ghi789",
-    title: "iPhone 16 Pro Review",
+    title: "iPhone photography tips that actually work",
     platform: "youtube",
-    category: "Tech",
-    notes: "Camera improvements are great",
-    thumbnailColor: "#2563EB",
+    category: "Tips",
+    notes: "Grid lines + rule of thirds",
+    thumbnailColor: "#10B981",
     createdAt: Date.now() - 518400000,
   },
   {
     id: "s7",
     url: "https://instagram.com/reel/abc",
-    title: "Homemade pizza tips",
+    title: "Lo-fi beats playlist — 3 hours",
     platform: "instagram",
-    category: "Cooking",
-    notes: "Neapolitan style dough recipe",
-    thumbnailColor: "#0891B2",
+    category: "Music",
+    notes: "Good for focus sessions",
+    thumbnailColor: "#3B82F6",
     createdAt: Date.now() - 604800000,
   },
   {
     id: "s8",
     url: "https://tiktok.com/@techguy/video/456",
-    title: "Top 5 VS Code Extensions",
+    title: "10 VS Code tricks you didn't know",
     platform: "tiktok",
     category: "Tech",
-    notes: "Must have extensions",
-    thumbnailColor: "#4F46E5",
+    notes: "Multi-cursor selection blew my mind",
+    thumbnailColor: "#6366F1",
     createdAt: Date.now() - 691200000,
+  },
+  {
+    id: "s9",
+    url: "https://youtube.com/watch?v=jkl101",
+    title: "30-day fitness challenge — Week 1",
+    platform: "youtube",
+    category: "Fitness",
+    notes: "No equipment needed",
+    thumbnailColor: "#EF4444",
+    createdAt: Date.now() - 777600000,
+  },
+  {
+    id: "s10",
+    url: "https://instagram.com/reel/mnop",
+    title: "Sourdough bread recipe — beginner friendly",
+    platform: "instagram",
+    category: "Recipes",
+    notes: "72 hour cold ferment version",
+    thumbnailColor: "#F97316",
+    createdAt: Date.now() - 864000000,
   },
 ];
 
@@ -169,27 +187,17 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         AsyncStorage.getItem(ITEMS_KEY),
         AsyncStorage.getItem(CATEGORIES_KEY),
       ]);
-      if (storedItems) {
-        setItems(JSON.parse(storedItems));
-      } else {
-        setItems(SAMPLE_ITEMS);
-      }
-      if (storedCategories) {
-        setCategories(JSON.parse(storedCategories));
-      }
+      setItems(storedItems ? JSON.parse(storedItems) : SAMPLE_ITEMS);
+      setCategories(storedCategories ? JSON.parse(storedCategories) : DEFAULT_CATEGORIES);
     } catch {
       setItems(SAMPLE_ITEMS);
+      setCategories(DEFAULT_CATEGORIES);
     }
     setLoaded(true);
   }
 
   const addItem = useCallback((item: Omit<SavedItem, "id" | "createdAt">) => {
-    const newItem: SavedItem = {
-      ...item,
-      id: generateId(),
-      createdAt: Date.now(),
-    };
-    setItems((prev) => [newItem, ...prev]);
+    setItems((prev) => [{ ...item, id: generateId(), createdAt: Date.now() }, ...prev]);
   }, []);
 
   const deleteItem = useCallback((id: string) => {
@@ -201,8 +209,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const addCategory = useCallback((category: Omit<Category, "id">) => {
-    const newCategory: Category = { ...category, id: generateId() };
-    setCategories((prev) => [...prev, newCategory]);
+    setCategories((prev) => [...prev, { ...category, id: generateId() }]);
   }, []);
 
   const deleteCategory = useCallback((id: string) => {

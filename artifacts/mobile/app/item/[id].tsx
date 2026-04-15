@@ -31,6 +31,22 @@ const PLATFORM_ICONS: Record<string, string> = {
   instagram: "instagram",
 };
 
+const PLATFORM_COLORS: Record<string, string> = {
+  youtube: "#FF0000",
+  tiktok: "#ffffff",
+  instagram: "#E1306C",
+};
+
+function formatReminder(ts: number) {
+  const now = Date.now();
+  const diff = ts - now;
+  const days = Math.ceil(diff / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days < 7) return `In ${days} days`;
+  return new Date(ts).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
 export default function ItemDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -42,10 +58,12 @@ export default function ItemDetailScreen() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(item?.notes || "");
 
+  const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 20;
+
   if (!item) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ color: colors.foreground, fontSize: 16 }}>Item not found</Text>
+        <Text style={{ color: colors.foreground }}>Item not found</Text>
       </View>
     );
   }
@@ -62,7 +80,7 @@ export default function ItemDetailScreen() {
   }
 
   function handleDelete() {
-    Alert.alert("Delete Video", "Are you sure you want to delete this saved video?", [
+    Alert.alert("Delete Video", "Remove this saved video?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -77,38 +95,35 @@ export default function ItemDetailScreen() {
   }
 
   const createdDate = new Date(item.createdAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+    month: "short", day: "numeric", year: "numeric",
   });
+
+  const hasReminder = item.reminder && item.reminder > Date.now();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 20 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
         <LinearGradient
-          colors={[item.thumbnailColor, item.thumbnailColor + "66", colors.background]}
+          colors={[item.thumbnailColor + "DD", item.thumbnailColor + "55", "transparent"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
-          style={styles.heroGradient}
+          style={styles.hero}
         >
-          <View style={styles.playContainer}>
-            <Pressable onPress={handleOpenLink} style={styles.bigPlayButton}>
-              <Feather name="play" size={32} color="#fff" />
-            </Pressable>
-          </View>
+          <Pressable onPress={handleOpenLink} style={styles.bigPlay}>
+            <View style={styles.bigPlayInner}>
+              <Feather name="play" size={30} color="#fff" />
+            </View>
+          </Pressable>
         </LinearGradient>
 
-        <View style={styles.infoSection}>
-          <View style={styles.platformRow}>
-            <View style={[styles.platformBadge, { backgroundColor: item.thumbnailColor + "22" }]}>
-              <Feather name={PLATFORM_ICONS[item.platform] as any} size={14} color={item.thumbnailColor} />
-              <Text style={[styles.platformText, { color: item.thumbnailColor }]}>
+        <View style={styles.body}>
+          <View style={styles.metaRow}>
+            <View style={[styles.platformBadge, { backgroundColor: item.thumbnailColor + "20" }]}>
+              <Feather name={PLATFORM_ICONS[item.platform] as any} size={12} color={PLATFORM_COLORS[item.platform]} />
+              <Text style={[styles.platformText, { color: colors.mutedForeground }]}>
                 {PLATFORM_LABELS[item.platform]}
               </Text>
             </View>
@@ -117,64 +132,96 @@ export default function ItemDetailScreen() {
 
           <Text style={[styles.title, { color: colors.foreground }]}>{item.title}</Text>
 
-          <View style={[styles.categoryBadge, { backgroundColor: item.thumbnailColor + "15" }]}>
-            <Feather name="folder" size={14} color={item.thumbnailColor} />
+          <View style={[styles.categoryBadge, { backgroundColor: item.thumbnailColor + "18" }]}>
+            <View style={[styles.dot, { backgroundColor: item.thumbnailColor }]} />
             <Text style={[styles.categoryText, { color: item.thumbnailColor }]}>{item.category}</Text>
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card, borderRadius: 16 }]}>
+        {hasReminder && (
+          <View style={[styles.card, { backgroundColor: "#F59E0B" + "12", borderColor: "#F59E0B" + "30" }]}>
+            <View style={styles.cardHeader}>
+              <Feather name="bell" size={15} color="#F59E0B" />
+              <Text style={[styles.cardTitle, { color: "#F59E0B" }]}>Reminder</Text>
+            </View>
+            <Text style={[styles.reminderText, { color: colors.foreground }]}>
+              {formatReminder(item.reminder!)}
+            </Text>
+            <Pressable onPress={() => updateItem(item.id, { reminder: undefined })} style={styles.clearReminder}>
+              <Text style={[styles.clearText, { color: "#F59E0B" }]}>Clear reminder</Text>
+            </Pressable>
+          </View>
+        )}
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
+            <Feather name="edit-3" size={15} color={colors.primary} />
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Notes</Text>
             <Pressable
               onPress={() => {
                 if (editingNotes) handleSaveNotes();
                 else setEditingNotes(true);
               }}
-              style={[styles.editBtn, { backgroundColor: colors.primary + "22" }]}
+              style={[styles.editBtn, { backgroundColor: editingNotes ? colors.primary : colors.secondary }]}
             >
-              <Feather name={editingNotes ? "check" : "edit-2"} size={16} color={colors.primary} />
+              <Text style={[styles.editBtnText, { color: editingNotes ? "#fff" : colors.mutedForeground }]}>
+                {editingNotes ? "Save" : "Edit"}
+              </Text>
             </Pressable>
           </View>
           {editingNotes ? (
             <TextInput
               value={notes}
               onChangeText={setNotes}
-              placeholder="Add your notes..."
+              placeholder="Write your thoughts..."
               placeholderTextColor={colors.mutedForeground}
-              style={[styles.notesInput, { color: colors.foreground, backgroundColor: colors.secondary, borderRadius: 12 }]}
+              style={[styles.notesInput, { color: colors.foreground, backgroundColor: colors.secondary, borderColor: colors.border }]}
               multiline
               textAlignVertical="top"
               autoFocus
             />
           ) : (
             <Text style={[styles.notesText, { color: item.notes ? colors.foreground : colors.mutedForeground }]}>
-              {item.notes || "No notes added"}
+              {item.notes || "No notes yet — tap Edit to add some"}
             </Text>
           )}
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card, borderRadius: 16 }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Link</Text>
-          <Text style={[styles.urlText, { color: colors.accent }]} numberOfLines={2}>
-            {item.url}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeader}>
+            <Feather name="zap" size={15} color={colors.accent} />
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Insights</Text>
+            <View style={[styles.comingSoonBadge, { backgroundColor: colors.accent + "18" }]}>
+              <Text style={[styles.comingSoonText, { color: colors.accent }]}>Soon</Text>
+            </View>
+          </View>
+          <Text style={[styles.notesText, { color: colors.mutedForeground }]}>
+            Auto-generated summary, key takeaways, and related content suggestions are coming soon.
           </Text>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeader}>
+            <Feather name="link" size={15} color={colors.mutedForeground} />
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Source</Text>
+          </View>
+          <Text style={[styles.urlText, { color: colors.accent }]} numberOfLines={2}>{item.url}</Text>
         </View>
 
         <Pressable onPress={handleOpenLink} style={styles.openBtn}>
           <LinearGradient
-            colors={["#8B5CF6", "#6366F1", "#06B6D4"]}
+            colors={["#9B72F7", "#5B6BF8", "#06B6D4"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.openBtnGradient}
+            style={styles.openBtnGrad}
           >
-            <Feather name="external-link" size={20} color="#fff" />
+            <Feather name="external-link" size={18} color="#fff" />
             <Text style={styles.openBtnText}>Open in App</Text>
           </LinearGradient>
         </Pressable>
 
-        <Pressable onPress={handleDelete} style={[styles.deleteBtn, { borderColor: colors.destructive }]}>
-          <Feather name="trash-2" size={18} color={colors.destructive} />
+        <Pressable onPress={handleDelete} style={[styles.deleteBtn, { borderColor: colors.border }]}>
+          <Feather name="trash-2" size={16} color={colors.destructive} />
           <Text style={[styles.deleteBtnText, { color: colors.destructive }]}>Delete Video</Text>
         </Pressable>
       </ScrollView>
@@ -183,139 +230,110 @@ export default function ItemDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    gap: 16,
-  },
-  heroGradient: {
-    height: 200,
+  container: { flex: 1 },
+  content: { gap: 12 },
+  hero: {
+    height: 180,
     justifyContent: "center",
     alignItems: "center",
   },
-  playContainer: {
-    alignItems: "center",
-  },
-  bigPlayButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  bigPlay: { alignItems: "center" },
+  bigPlayInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
-    paddingLeft: 4,
+    paddingLeft: 3,
   },
-  infoSection: {
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  platformRow: {
+  body: { paddingHorizontal: 16, gap: 8 },
+  metaRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
   },
   platformBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 5,
   },
-  platformText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  date: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
-  title: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    lineHeight: 28,
-  },
+  platformText: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  date: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  title: { fontSize: 21, fontFamily: "Inter_700Bold", lineHeight: 27, letterSpacing: -0.5 },
   categoryBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 5,
   },
-  categoryText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  categoryText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   card: {
     marginHorizontal: 16,
     padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
     gap: 10,
   },
   cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 7,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
+  cardTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold", flex: 1 },
   editBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
+  editBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   notesInput: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     minHeight: 80,
+    borderRadius: 10,
+    borderWidth: 1,
+    lineHeight: 20,
   },
   notesText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    lineHeight: 20,
+    lineHeight: 21,
   },
-  urlText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  openBtn: {
-    marginHorizontal: 16,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  openBtnGradient: {
+  reminderText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  clearReminder: { alignSelf: "flex-start" },
+  clearText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  comingSoonBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  comingSoonText: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
+  urlText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  openBtn: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
+  openBtnGrad: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
+    paddingVertical: 15,
     borderRadius: 14,
     gap: 8,
   },
-  openBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
+  openBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
   deleteBtn: {
     marginHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 8,
+    gap: 7,
   },
-  deleteBtnText: {
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-  },
+  deleteBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
 });
