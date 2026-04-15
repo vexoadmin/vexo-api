@@ -2,9 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useSavedItems } from "@/contexts/SavedItemsContext";
+import { fetchVideoMetadata, VideoMetadata } from "@/utils/videoMetadata";
 
 const BG = "#060814";
 const SURFACE = "#0B1020";
@@ -80,10 +83,38 @@ export default function AddScreen() {
   const [notes, setNotes] = useState("");
   const [reminder, setReminder] = useState<number | undefined>(undefined);
   const [showCustomDate, setShowCustomDate] = useState(false);
+  const [fetchedMeta, setFetchedMeta] = useState<VideoMetadata | null>(null);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const userTypedTitle = useRef(false);
 
   const detectedPlatform = detectPlatform(url);
   const platformColor = detectedPlatform ? PLATFORM_COLORS[detectedPlatform] : null;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 16;
+
+  useEffect(() => {
+    if (!detectedPlatform) {
+      setFetchedMeta(null);
+      setMetaLoading(false);
+      return;
+    }
+    setMetaLoading(true);
+    setFetchedMeta(null);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const meta = await fetchVideoMetadata(normalizeUrl(url), detectedPlatform);
+      if (!cancelled) {
+        setFetchedMeta(meta);
+        setMetaLoading(false);
+        if (meta.title && !userTypedTitle.current) {
+          setTitle(meta.title);
+        }
+      }
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [url, detectedPlatform]);
 
   function handleSave() {
     if (!url.trim()) { Alert.alert("Missing URL", "Please enter a video link"); return; }
@@ -97,6 +128,7 @@ export default function AddScreen() {
       category: selectedCategory,
       notes: notes.trim(),
       thumbnailColor: "#8B5CF6",
+      thumbnailUrl: fetchedMeta?.thumbnailUrl,
       reminder,
     });
     router.back();
@@ -150,33 +182,64 @@ export default function AddScreen() {
         <View style={styles.previewCard}>
           {detectedPlatform ? (
             <>
-              <LinearGradient
-                colors={["#D946EF22", "#8B5CF615", "#22D3EE20"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
+              {/* Background: real thumbnail OR gradient placeholder */}
+              {fetchedMeta?.thumbnailUrl ? (
+                <>
+                  <Image
+                    source={{ uri: fetchedMeta.thumbnailUrl }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    resizeMode="cover"
+                  />
+                  <LinearGradient
+                    colors={["rgba(6,8,20,0.18)", "rgba(6,8,20,0.72)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  />
+                </>
+              ) : (
+                <LinearGradient
+                  colors={["#D946EF22", "#8B5CF615", "#22D3EE20"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                />
+              )}
+
+              {/* Top row: platform badge + status */}
               <View style={styles.previewTop}>
-                <View style={[styles.previewPlatformBadge, { backgroundColor: platformColor! + "18", borderColor: platformColor! + "30" }]}>
+                <View style={[styles.previewPlatformBadge, { backgroundColor: platformColor! + "28", borderColor: platformColor! + "50" }]}>
                   <Feather name={PLATFORM_ICONS[detectedPlatform] as any} size={12} color={platformColor!} />
                   <Text style={[styles.previewPlatformText, { color: platformColor! }]}>
                     {PLATFORM_NAMES[detectedPlatform]}
                   </Text>
                 </View>
                 <View style={styles.previewConfirmed}>
-                  <Feather name="check-circle" size={12} color="#34D399" />
-                  <Text style={styles.previewConfirmedText}>Link confirmed</Text>
+                  {metaLoading ? (
+                    <ActivityIndicator size="small" color="#A5F3FC" />
+                  ) : (
+                    <>
+                      <Feather name="check-circle" size={12} color="#34D399" />
+                      <Text style={styles.previewConfirmedText}>
+                        {fetchedMeta?.thumbnailUrl ? "Preview ready" : "Link confirmed"}
+                      </Text>
+                    </>
+                  )}
                 </View>
               </View>
+
+              {/* Center play button */}
               <View style={styles.previewPlayArea}>
-                <View style={[styles.previewPlayBtn, { borderColor: platformColor! + "50" }]}>
-                  <Feather name="play" size={20} color={platformColor!} style={{ marginLeft: 2 }} />
+                <View style={[styles.previewPlayBtn, { borderColor: "rgba(255,255,255,0.35)" }]}>
+                  <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
                 </View>
               </View>
-              <Text style={styles.previewDesc}>{PLATFORM_DESC[detectedPlatform]}</Text>
-              {url.length > 0 && (
-                <Text style={styles.previewUrl} numberOfLines={1}>{url}</Text>
-              )}
+
+              {/* Title from metadata OR generic description */}
+              <Text style={styles.previewDesc} numberOfLines={2}>
+                {fetchedMeta?.title || PLATFORM_DESC[detectedPlatform]}
+              </Text>
+              <Text style={styles.previewUrl} numberOfLines={1}>{url}</Text>
             </>
           ) : (
             <View style={styles.previewEmpty}>
@@ -192,7 +255,7 @@ export default function AddScreen() {
           <Text style={styles.label}>TITLE</Text>
           <TextInput
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(t) => { setTitle(t); userTypedTitle.current = true; }}
             placeholder="Give it a memorable title"
             placeholderTextColor="rgba(255,255,255,0.28)"
             style={styles.input}

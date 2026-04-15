@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { SavedItem } from "@/contexts/SavedItemsContext";
 
@@ -12,7 +12,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   instagram: "Instagram",
 };
 
-const BG = "#060814";
 const BORDER = "rgba(255,255,255,0.10)";
 const CARD_BG = "rgba(255,255,255,0.04)";
 
@@ -47,20 +46,40 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
       >
         {/* Thumbnail */}
         <View style={[styles.thumb, { height: thumbHeight }]}>
-          {/* Main gradient */}
-          <LinearGradient
-            colors={["#D946EF40", "#8B5CF626", "#22D3EE33"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Radial highlight top-left */}
-          <LinearGradient
-            colors={["rgba(255,255,255,0.20)", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.65, y: 0.65 }}
-            style={StyleSheet.absoluteFill}
-          />
+          {item.thumbnailUrl ? (
+            <>
+              {/* Real thumbnail */}
+              <Image
+                source={{ uri: item.thumbnailUrl }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+              {/* Bottom scrim so category pill is readable */}
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.60)"]}
+                start={{ x: 0, y: 0.4 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          ) : (
+            <>
+              {/* Gradient placeholder */}
+              <LinearGradient
+                colors={["#D946EF40", "#8B5CF626", "#22D3EE33"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              {/* Radial highlight top-left */}
+              <LinearGradient
+                colors={["rgba(255,255,255,0.20)", "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.65, y: 0.65 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          )}
 
           {/* Reminder dot */}
           {item.reminder && item.reminder > Date.now() && (
@@ -119,7 +138,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 8,
     left: 8,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: "rgba(0,0,0,0.50)",
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,

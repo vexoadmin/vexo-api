@@ -6,6 +6,7 @@ import * as Linking from "expo-linking";
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -146,21 +147,39 @@ export default function ItemDetailScreen() {
       >
         {/* ── 1. Hero thumbnail card ── */}
         <View style={styles.heroCard}>
-          {/* Thumbnail gradient */}
+          {/* Thumbnail */}
           <View style={styles.thumb}>
-            <LinearGradient
-              colors={["#22D3EE33", "#8B5CF626", "#D946EF33"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            {/* Radial highlight */}
-            <LinearGradient
-              colors={["rgba(255,255,255,0.18)", "transparent"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.65, y: 0.65 }}
-              style={StyleSheet.absoluteFill}
-            />
+            {item.thumbnailUrl ? (
+              <>
+                <Image
+                  source={{ uri: item.thumbnailUrl }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                />
+                {/* Scrim for overlay readability */}
+                <LinearGradient
+                  colors={["rgba(0,0,0,0.15)", "rgba(0,0,0,0.55)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </>
+            ) : (
+              <>
+                <LinearGradient
+                  colors={["#22D3EE33", "#8B5CF626", "#D946EF33"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.18)", "transparent"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.65, y: 0.65 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </>
+            )}
             {/* Category pill — top left */}
             <View style={styles.heroCatPill}>
               <Text style={styles.heroPillText}>{item.category}</Text>

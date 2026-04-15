@@ -18,11 +18,12 @@ Mobile app for saving and organizing video links from TikTok, Instagram, and You
 
 ## App Structure
 
-- **Home screen** — Pinterest-style 2-column grid of saved videos with search
+- **Home screen** — Pinterest-style 2-column grid of saved videos with real thumbnails (or gradient placeholders)
 - **Categories screen** — List of categories with item counts, create new categories
 - **Category detail** — Filtered grid of videos in a category
-- **Add item** — Save a new video link with URL detection, category, and notes
-- **Item detail** — View video details, edit notes, open link, delete
+- **Add item** — Save a new video link with URL detection, real thumbnail preview, auto-filled title, category, and notes
+- **Item detail** — View video details with real hero thumbnail, edit notes, open link, delete
+- **Thumbnail system** — YouTube: `img.youtube.com/vi/{ID}/hqdefault.jpg` (no API key); TikTok/Instagram: oEmbed with graceful fallback to gradient placeholder
 
 ## Design
 

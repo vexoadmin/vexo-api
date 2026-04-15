@@ -9,6 +9,7 @@ export interface SavedItem {
   category: string;
   notes: string;
   thumbnailColor: string;
+  thumbnailUrl?: string;
   createdAt: number;
   reminder?: number;
 }
