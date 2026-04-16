@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -24,18 +25,28 @@ const BORDER = "rgba(255,255,255,0.10)";
 const CATEGORY_COLORS = [
   "#D946EF", "#8B5CF6", "#22D3EE", "#F472B6",
   "#34D399", "#FBBF24", "#60A5FA", "#F87171",
+  "#F97316", "#EC4899", "#06B6D4", "#10B981",
+  "#F59E0B", "#EF4444", "#6366F1", "#3B82F6",
 ];
+
 const CATEGORY_ICONS = [
   "folder", "heart", "star", "film",
   "coffee", "globe", "zap", "activity",
+  "book-open", "check-circle", "music", "cpu",
+  "camera", "award", "flag", "map-pin",
+  "shopping-bag", "sun", "briefcase", "home",
+  "mic", "headphones", "monitor", "tool",
+  "archive", "bell", "bookmark", "feather",
 ];
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { categories, items, addCategory } = useSavedItems();
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState("");
+  const { categories, items, addCategory, updateCategory, deleteCategory } = useSavedItems();
+
+  const [formMode, setFormMode] = useState<"none" | "add" | "edit">("none");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formName, setFormName] = useState("");
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedIcon, setSelectedIcon] = useState(0);
 
@@ -50,28 +61,85 @@ export default function CategoriesScreen() {
     return counts;
   }, [items]);
 
+  function openAdd() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFormName("");
+    setSelectedColor(0);
+    setSelectedIcon(0);
+    setEditingId(null);
+    setFormMode("add");
+  }
+
+  function openEdit(id: string) {
+    const cat = categories.find((c) => c.id === id);
+    if (!cat) return;
+    const colorIdx = CATEGORY_COLORS.indexOf(cat.color);
+    const iconIdx = CATEGORY_ICONS.indexOf(cat.icon);
+    setFormName(cat.name);
+    setSelectedColor(colorIdx >= 0 ? colorIdx : 0);
+    setSelectedIcon(iconIdx >= 0 ? iconIdx : 0);
+    setEditingId(id);
+    setFormMode("edit");
+  }
+
+  function closeForm() {
+    setFormMode("none");
+    setEditingId(null);
+    setFormName("");
+  }
+
   function handleAdd() {
-    if (!newName.trim()) return;
+    if (!formName.trim()) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addCategory({
-      name: newName.trim(),
+      name: formName.trim(),
       color: CATEGORY_COLORS[selectedColor],
       icon: CATEGORY_ICONS[selectedIcon],
     });
-    setNewName("");
-    setShowAdd(false);
+    closeForm();
   }
 
-  function openAdd() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowAdd(true);
+  function handleSaveEdit() {
+    if (!formName.trim() || !editingId) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    updateCategory(editingId, {
+      name: formName.trim(),
+      color: CATEGORY_COLORS[selectedColor],
+      icon: CATEGORY_ICONS[selectedIcon],
+    });
+    closeForm();
+  }
+
+  function handleDelete(id: string) {
+    const cat = categories.find((c) => c.id === id);
+    if (!cat) return;
+    const count = categoryItemCounts[cat.name] || 0;
+    Alert.alert(
+      "Delete Category",
+      count > 0
+        ? `"${cat.name}" has ${count} saved item${count !== 1 ? "s" : ""}. Deleting it will unlink those items — they won't be deleted. Continue?`
+        : `Delete "${cat.name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            deleteCategory(id);
+            if (editingId === id) closeForm();
+          },
+        },
+      ]
+    );
   }
 
   const totalVideos = items.length;
+  const isEditing = formMode === "edit";
+  const showForm = formMode !== "none";
 
   return (
     <View style={styles.container}>
-      {/* Ambient glow */}
       <View style={styles.glowBottom} pointerEvents="none" />
 
       <FlatList
@@ -99,8 +167,8 @@ export default function CategoriesScreen() {
               </View>
             </View>
 
-            {/* ── Add form ── */}
-            {showAdd && (
+            {/* ── Add / Edit form ── */}
+            {showForm && (
               <View style={styles.addForm}>
                 <View style={styles.addFormHeader}>
                   <LinearGradient
@@ -109,17 +177,19 @@ export default function CategoriesScreen() {
                     end={{ x: 1, y: 0 }}
                     style={styles.addFormIconWrap}
                   >
-                    <Feather name="folder-plus" size={16} color="#fff" />
+                    <Feather name={isEditing ? "edit-2" : "folder-plus"} size={15} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.addFormTitle}>New Collection</Text>
-                  <Pressable onPress={() => { setShowAdd(false); setNewName(""); }} hitSlop={8}>
+                  <Text style={styles.addFormTitle}>
+                    {isEditing ? "Edit Collection" : "New Collection"}
+                  </Text>
+                  <Pressable onPress={closeForm} hitSlop={8}>
                     <Feather name="x" size={18} color="rgba(255,255,255,0.35)" />
                   </Pressable>
                 </View>
 
                 <TextInput
-                  value={newName}
-                  onChangeText={setNewName}
+                  value={formName}
+                  onChangeText={setFormName}
                   placeholder="Collection name..."
                   placeholderTextColor="rgba(255,255,255,0.28)"
                   style={styles.formInput}
@@ -145,28 +215,54 @@ export default function CategoriesScreen() {
                     <Pressable
                       key={icon}
                       onPress={() => setSelectedIcon(i)}
-                      style={[styles.iconSwatch, selectedIcon === i && { backgroundColor: CATEGORY_COLORS[selectedColor] + "20", borderColor: CATEGORY_COLORS[selectedColor] + "60" }]}
+                      style={[
+                        styles.iconSwatch,
+                        selectedIcon === i && {
+                          backgroundColor: CATEGORY_COLORS[selectedColor] + "20",
+                          borderColor: CATEGORY_COLORS[selectedColor] + "60",
+                        },
+                      ]}
                     >
-                      <Feather name={icon as any} size={16} color={selectedIcon === i ? CATEGORY_COLORS[selectedColor] : "rgba(255,255,255,0.35)"} />
+                      <Feather
+                        name={icon as any}
+                        size={16}
+                        color={selectedIcon === i ? CATEGORY_COLORS[selectedColor] : "rgba(255,255,255,0.35)"}
+                      />
                     </Pressable>
                   ))}
                 </View>
 
-                <Pressable onPress={handleAdd} style={{ borderRadius: 18, overflow: "hidden" }}>
-                  <LinearGradient
-                    colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.createBtn}
+                <View style={styles.formActions}>
+                  {isEditing && (
+                    <Pressable
+                      onPress={() => handleDelete(editingId!)}
+                      style={styles.deleteBtn}
+                    >
+                      <Feather name="trash-2" size={14} color="#EF4444" />
+                      <Text style={styles.deleteBtnText}>Delete</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    onPress={isEditing ? handleSaveEdit : handleAdd}
+                    style={[styles.createBtnWrap, { flex: 1 }]}
+                    disabled={!formName.trim()}
                   >
-                    <Feather name="plus" size={15} color="#fff" />
-                    <Text style={styles.createBtnText}>Create Collection</Text>
-                  </LinearGradient>
-                </Pressable>
+                    <LinearGradient
+                      colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[styles.createBtn, { opacity: formName.trim() ? 1 : 0.45 }]}
+                    >
+                      <Feather name={isEditing ? "check" : "plus"} size={15} color="#fff" />
+                      <Text style={styles.createBtnText}>
+                        {isEditing ? "Save Changes" : "Create Collection"}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
               </View>
             )}
 
-            {/* ── Section label ── */}
             <Text style={styles.sectionLabel}>ALL COLLECTIONS</Text>
           </View>
         }
@@ -178,6 +274,7 @@ export default function CategoriesScreen() {
                 category={category}
                 itemCount={categoryItemCounts[category.name] || 0}
                 onPress={() => router.push(`/category/${category.id}`)}
+                onEdit={() => openEdit(category.id)}
                 index={i}
               />
             ))}
@@ -269,7 +366,28 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
     alignItems: "center", justifyContent: "center",
   },
-  createBtn: { paddingVertical: 15, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  formActions: { flexDirection: "row", gap: 10 },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.30)",
+    backgroundColor: "rgba(239,68,68,0.06)",
+  },
+  deleteBtnText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#EF4444" },
+  createBtnWrap: { borderRadius: 16, overflow: "hidden" },
+  createBtn: {
+    paddingVertical: 15,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
   createBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   sectionLabel: {

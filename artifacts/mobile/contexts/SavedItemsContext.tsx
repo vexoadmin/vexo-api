@@ -28,6 +28,7 @@ interface SavedItemsContextType {
   deleteItem: (id: string) => void;
   updateItem: (id: string, updates: Partial<SavedItem>) => void;
   addCategory: (category: Omit<Category, "id">) => void;
+  updateCategory: (id: string, updates: Partial<Omit<Category, "id">>) => void;
   deleteCategory: (id: string) => void;
   searchItems: (query: string) => SavedItem[];
 }
@@ -213,6 +214,25 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
     setCategories((prev) => [...prev, { ...category, id: generateId() }]);
   }, []);
 
+  const updateCategory = useCallback(
+    (id: string, updates: Partial<Omit<Category, "id">>) => {
+      setCategories((prev) => {
+        const oldCat = prev.find((c) => c.id === id);
+        if (oldCat && updates.name && updates.name !== oldCat.name) {
+          const oldName = oldCat.name;
+          const newName = updates.name;
+          setItems((items) =>
+            items.map((item) =>
+              item.category === oldName ? { ...item, category: newName } : item
+            )
+          );
+        }
+        return prev.map((c) => (c.id === id ? { ...c, ...updates } : c));
+      });
+    },
+    []
+  );
+
   const deleteCategory = useCallback((id: string) => {
     setCategories((prev) => prev.filter((c) => c.id !== id));
   }, []);
@@ -233,7 +253,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <SavedItemsContext.Provider
-      value={{ items, categories, addItem, deleteItem, updateItem, addCategory, deleteCategory, searchItems }}
+      value={{ items, categories, addItem, deleteItem, updateItem, addCategory, updateCategory, deleteCategory, searchItems }}
     >
       {children}
     </SavedItemsContext.Provider>

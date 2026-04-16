@@ -10,10 +10,11 @@ interface CategoryCardProps {
   category: Category;
   itemCount: number;
   onPress: () => void;
+  onEdit?: () => void;
   index?: number;
 }
 
-export function CategoryCard({ category, itemCount, onPress, index = 0 }: CategoryCardProps) {
+export function CategoryCard({ category, itemCount, onPress, onEdit, index = 0 }: CategoryCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const isEven = index % 2 === 0;
 
@@ -26,6 +27,10 @@ export function CategoryCard({ category, itemCount, onPress, index = 0 }: Catego
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
+  }
+  function handleEditPress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onEdit?.();
   }
 
   return (
@@ -63,6 +68,13 @@ export function CategoryCard({ category, itemCount, onPress, index = 0 }: Catego
         {/* Name + description */}
         <Text style={styles.name}>{category.name}</Text>
         <Text style={styles.desc}>Quick access to everything saved here</Text>
+
+        {/* Edit button */}
+        {onEdit && (
+          <Pressable onPress={handleEditPress} style={styles.editBtn} hitSlop={6}>
+            <Feather name="edit-2" size={12} color="rgba(255,255,255,0.45)" />
+          </Pressable>
+        )}
       </Pressable>
     </Animated.View>
   );
@@ -190,5 +202,18 @@ const styles = StyleSheet.create({
     color: "rgba(165,243,252,0.70)",
     lineHeight: 17,
     marginTop: 2,
+  },
+  editBtn: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
