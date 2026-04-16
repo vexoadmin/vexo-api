@@ -345,7 +345,11 @@ export default function ItemDetailScreen() {
                       },
                     ]}
                   >
-                    <Text style={styles.catChipIcon}>{cat.icon}</Text>
+                    <Feather
+                      name={cat.icon as any}
+                      size={13}
+                      color={selected ? cat.color : "rgba(255,255,255,0.55)"}
+                    />
                     <Text style={[styles.catChipText, selected && { color: cat.color }]}>
                       {cat.name}
                     </Text>
@@ -902,9 +906,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  catChipIcon: {
-    fontSize: 13,
   },
   catChipText: {
     fontSize: 13,
