@@ -25,7 +25,7 @@ export function getYoutubeThumbnail(videoId: string): string {
 
 /* ─── Helper: abort-safe fetch with timeout ─────────────── */
 
-async function timedFetch(url: string, ms = 6000): Promise<Response | null> {
+async function timedFetch(url: string, ms = 8000): Promise<Response | null> {
   try {
     const ctrl = new AbortController();
     const id = setTimeout(() => ctrl.abort(), ms);
@@ -58,10 +58,12 @@ async function fetchNoembed(url: string): Promise<{ title?: string; thumbnailUrl
 }
 
 /* ─── Source 2: Microlink — OG-tag extractor, all platforms ─ */
+/* Server-side: follows redirects automatically (pin.it etc) */
 
-async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?: string }> {
+async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?: string; description?: string }> {
+  /* Use &meta=true for Pinterest to also get description-based title fallback */
   const res = await timedFetch(
-    `https://api.microlink.io/?url=${encodeURIComponent(url)}`
+    `https://api.microlink.io/?url=${encodeURIComponent(url)}&palette=false&audio=false&video=false&iframe=false`
   );
   if (!res || !res.ok) return {};
   try {
@@ -69,11 +71,56 @@ async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?:
     if (json?.status !== "success" || !json.data) return {};
     return {
       title: json.data.title || undefined,
-      imageUrl: json.data.image?.url || undefined,
+      imageUrl: json.data.image?.url || json.data.logo?.url || undefined,
+      description: json.data.description || undefined,
     };
   } catch {
     return {};
   }
+}
+
+/* ─── Source 3: Pinterest-specific — resolve pin.it then Microlink ─ */
+/*
+ * pin.it short links redirect (301/302) to the full pinterest.com URL.
+ * fetch() in React Native DOES follow redirects natively, so we can
+ * resolve the final URL ourselves and pass it to Microlink for OG extraction.
+ * Microlink also follows redirects server-side, so passing pin.it directly
+ * also works — but passing the resolved URL gives faster, more reliable results.
+ */
+
+async function resolvePinIt(url: string): Promise<string> {
+  const lower = url.toLowerCase();
+  if (!lower.includes("pin.it")) return url;
+  try {
+    /* React Native fetch follows redirects — read the final response URL */
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      method: "GET",
+      redirect: "follow",
+    });
+    clearTimeout(id);
+    /* res.url is the final URL after all redirects */
+    if (res.url && res.url !== url) return res.url;
+  } catch {
+    /* fall through — just use original URL */
+  }
+  return url;
+}
+
+async function fetchPinterestMeta(url: string): Promise<{ title?: string; thumbnailUrl?: string }> {
+  /* Step 1: resolve short link to the canonical Pinterest URL */
+  const resolvedUrl = await resolvePinIt(url);
+
+  /* Step 2: pass the resolved (or original) URL to Microlink */
+  const ml = await fetchMicrolink(resolvedUrl);
+
+  /* Step 3: build best result — title from og:title or description; image from og:image */
+  const title = ml.title || ml.description?.slice(0, 80) || undefined;
+  const thumbnailUrl = ml.imageUrl || undefined;
+
+  return { title, thumbnailUrl };
 }
 
 /* ─── Main export ─────────────────────────────────────────── */
@@ -86,7 +133,12 @@ export async function fetchVideoMetadata(
   const videoId = platform === "youtube" ? extractYoutubeId(url) : null;
   const ytThumbnail = videoId ? getYoutubeThumbnail(videoId) : undefined;
 
-  /* Generic websites: only microlink works (noembed only handles embeds) */
+  /* Pinterest: custom resolver to handle pin.it short links */
+  if (platform === "pinterest") {
+    return fetchPinterestMeta(url);
+  }
+
+  /* Generic websites: only microlink works (noembed only handles video embeds) */
   if (platform === "website") {
     const ml = await fetchMicrolink(url);
     return { title: ml.title, thumbnailUrl: ml.imageUrl };

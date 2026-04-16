@@ -24,7 +24,7 @@ const BG = "#060814";
 const SURFACE = "#0B1020";
 const BORDER = "rgba(255,255,255,0.10)";
 
-type PlatformType = "youtube" | "tiktok" | "instagram" | "facebook" | "website";
+type PlatformType = "youtube" | "tiktok" | "instagram" | "facebook" | "website" | "pinterest";
 
 const PLATFORM_COLORS: Record<string, string> = {
   youtube: "#EF4444",
@@ -32,6 +32,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   instagram: "#D946EF",
   facebook: "#8B5CF6",
   website: "#6366F1",
+  pinterest: "#E60023",
 };
 const PLATFORM_ICONS: Record<string, string> = {
   youtube: "play-circle",
@@ -39,6 +40,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   instagram: "camera",
   facebook: "users",
   website: "globe",
+  pinterest: "bookmark",
 };
 const PLATFORM_NAMES: Record<string, string> = {
   youtube: "YouTube",
@@ -46,6 +48,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   instagram: "Instagram",
   facebook: "Facebook",
   website: "Website",
+  pinterest: "Pinterest",
 };
 const PLATFORM_DESC: Record<string, string> = {
   youtube: "YouTube video",
@@ -53,6 +56,7 @@ const PLATFORM_DESC: Record<string, string> = {
   instagram: "Instagram post",
   facebook: "Facebook video",
   website: "Web page",
+  pinterest: "Pinterest pin",
 };
 
 function normalizeUrl(url: string): string {
@@ -78,6 +82,7 @@ function detectPlatform(url: string): PlatformType | null {
   if (lower.includes("tiktok.com")) return "tiktok";
   if (lower.includes("instagram.com")) return "instagram";
   if (lower.includes("facebook.com") || lower.includes("fb.watch") || lower.includes("fb.com")) return "facebook";
+  if (lower.includes("pinterest.com") || lower.includes("pinterest.co") || lower.includes("pin.it")) return "pinterest";
   /* Any other syntactically valid URL → generic website */
   if (isValidUrl(url)) return "website";
   return null;

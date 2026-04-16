@@ -46,6 +46,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   instagram: "Instagram",
   facebook: "Facebook",
   website: "Website",
+  pinterest: "Pinterest",
 };
 const PLATFORM_ICONS: Record<string, string> = {
   youtube: "play-circle",
@@ -53,6 +54,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   instagram: "camera",
   facebook: "users",
   website: "globe",
+  pinterest: "bookmark",
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -61,6 +63,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   instagram: "#D946EF",
   facebook: "#8B5CF6",
   website: "#6366F1",
+  pinterest: "#E60023",
 };
 
 function extractDomain(url: string): string {
