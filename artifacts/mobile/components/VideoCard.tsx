@@ -10,6 +10,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   tiktok: "TikTok",
   instagram: "Instagram",
+  facebook: "Facebook",
 };
 
 const BORDER = "rgba(255,255,255,0.10)";

@@ -35,7 +35,7 @@ async function safeFetch(url: string): Promise<Response | null> {
 
 export async function fetchVideoMetadata(
   url: string,
-  platform: "youtube" | "tiktok" | "instagram"
+  platform: "youtube" | "tiktok" | "instagram" | "facebook"
 ): Promise<VideoMetadata> {
   if (platform === "youtube") {
     const videoId = extractYoutubeId(url);

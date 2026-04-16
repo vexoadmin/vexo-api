@@ -44,11 +44,13 @@ const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   tiktok: "TikTok",
   instagram: "Instagram",
+  facebook: "Facebook",
 };
 const PLATFORM_ICONS: Record<string, string> = {
   youtube: "youtube",
   tiktok: "music",
   instagram: "instagram",
+  facebook: "facebook",
 };
 
 function formatDate(ts: number) {

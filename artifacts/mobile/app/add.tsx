@@ -28,28 +28,33 @@ const PLATFORM_COLORS: Record<string, string> = {
   youtube: "#FF5252",
   tiktok: "#A0AAFF",
   instagram: "#E879A0",
+  facebook: "#60A5FA",
 };
 const PLATFORM_ICONS: Record<string, string> = {
   youtube: "youtube",
   tiktok: "music",
   instagram: "instagram",
+  facebook: "facebook",
 };
 const PLATFORM_NAMES: Record<string, string> = {
   youtube: "YouTube",
   tiktok: "TikTok",
   instagram: "Instagram",
+  facebook: "Facebook",
 };
 const PLATFORM_DESC: Record<string, string> = {
   youtube: "YouTube video detected",
   tiktok: "TikTok video detected",
   instagram: "Instagram reel detected",
+  facebook: "Facebook video detected",
 };
 
-function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | null {
+function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | "facebook" | null {
   const lower = url.toLowerCase();
   if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
   if (lower.includes("tiktok.com")) return "tiktok";
   if (lower.includes("instagram.com")) return "instagram";
+  if (lower.includes("facebook.com") || lower.includes("fb.watch") || lower.includes("fb.com")) return "facebook";
   return null;
 }
 
@@ -123,7 +128,7 @@ export default function AddScreen() {
       setUrlError("Please paste a video link before saving");
       valid = false;
     } else if (!detectedPlatform) {
-      setUrlError("Link must be from YouTube, TikTok, or Instagram");
+      setUrlError("Link must be from YouTube, TikTok, Instagram, or Facebook");
       valid = false;
     } else {
       setUrlError("");
