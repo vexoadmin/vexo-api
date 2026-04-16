@@ -25,16 +25,16 @@ const SURFACE = "#0B1020";
 const BORDER = "rgba(255,255,255,0.10)";
 
 const PLATFORM_COLORS: Record<string, string> = {
-  youtube: "#FF5252",
-  tiktok: "#A0AAFF",
-  instagram: "#E879A0",
-  facebook: "#60A5FA",
+  youtube: "#EF4444",
+  tiktok: "#22D3EE",
+  instagram: "#D946EF",
+  facebook: "#8B5CF6",
 };
 const PLATFORM_ICONS: Record<string, string> = {
-  youtube: "youtube",
-  tiktok: "music",
-  instagram: "instagram",
-  facebook: "facebook",
+  youtube: "play-circle",
+  tiktok: "video",
+  instagram: "camera",
+  facebook: "users",
 };
 const PLATFORM_NAMES: Record<string, string> = {
   youtube: "YouTube",
@@ -63,6 +63,15 @@ function normalizeUrl(url: string): string {
   if (!trimmed) return trimmed;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return "https://" + trimmed;
+}
+
+function extractDomain(url: string): string {
+  try {
+    const { hostname } = new URL(normalizeUrl(url));
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return url.slice(0, 28);
+  }
 }
 
 const REMINDER_OPTIONS = [
@@ -234,12 +243,33 @@ export default function AddScreen() {
                   />
                 </>
               ) : (
-                <LinearGradient
-                  colors={["#D946EF22", "#8B5CF615", "#22D3EE20"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                />
+                /* No thumbnail yet — styled fallback, never blank */
+                <>
+                  <LinearGradient
+                    colors={["#D946EF1A", "#8B5CF610", "#22D3EE1A"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  />
+                  <LinearGradient
+                    colors={[platformColor! + "28", "transparent"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.7, y: 0.7 }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  />
+                  {/* Centered domain + icon in the fallback */}
+                  <View style={styles.previewFallbackCenter}>
+                    <View style={[styles.previewFallbackIconWrap, {
+                      borderColor: platformColor! + "50",
+                      backgroundColor: platformColor! + "18",
+                    }]}>
+                      <Feather name={PLATFORM_ICONS[detectedPlatform] as any} size={24} color={platformColor!} />
+                    </View>
+                    <Text style={[styles.previewFallbackDomain, { color: platformColor! + "BB" }]}>
+                      {extractDomain(url)}
+                    </Text>
+                  </View>
+                </>
               )}
 
               {/* Top row: platform badge + status */}
@@ -264,12 +294,17 @@ export default function AddScreen() {
                 </View>
               </View>
 
-              {/* Center play button */}
-              <View style={styles.previewPlayArea}>
-                <View style={[styles.previewPlayBtn, { borderColor: "rgba(255,255,255,0.35)" }]}>
-                  <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+              {/* Center play button — only when we have a real thumbnail */}
+              {fetchedMeta?.thumbnailUrl ? (
+                <View style={styles.previewPlayArea}>
+                  <View style={[styles.previewPlayBtn, { borderColor: "rgba(255,255,255,0.35)" }]}>
+                    <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                  </View>
                 </View>
-              </View>
+              ) : (
+                /* Spacer so card height stays consistent */
+                <View style={{ height: 16 }} />
+              )}
 
               {/* Title from metadata OR generic description */}
               <Text style={styles.previewDesc} numberOfLines={2}>
@@ -479,7 +514,27 @@ const styles = StyleSheet.create({
 
   previewCard: {
     backgroundColor: SURFACE, borderRadius: 20, borderWidth: 1, borderColor: BORDER,
-    minHeight: 150, overflow: "hidden", padding: 16, gap: 10,
+    minHeight: 170, overflow: "hidden", padding: 16, gap: 10,
+  },
+  previewFallbackCenter: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  previewFallbackIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewFallbackDomain: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.2,
   },
   previewTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   previewPlatformBadge: {

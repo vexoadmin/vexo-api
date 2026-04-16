@@ -3,6 +3,8 @@ export interface VideoMetadata {
   title?: string;
 }
 
+/* ─── YouTube helpers (no CORS needed) ─────────────────── */
+
 export function extractYoutubeId(url: string): string | null {
   const patterns = [
     /[?&]v=([a-zA-Z0-9_-]{11})/,
@@ -21,57 +23,65 @@ export function getYoutubeThumbnail(videoId: string): string {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
-async function safeFetch(url: string): Promise<Response | null> {
+/* ─── Microlink — CORS-safe OG metadata for all platforms ─ */
+
+interface MicrolinkResponse {
+  status: "success" | "error" | "fail";
+  data?: {
+    title?: string | null;
+    description?: string | null;
+    image?: { url?: string | null } | null;
+    logo?: { url?: string | null } | null;
+  };
+}
+
+async function fetchMicrolinkMeta(url: string): Promise<{ title?: string; imageUrl?: string }> {
   try {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(id);
-    return res;
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(
+      `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=false`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+
+    if (!res.ok) return {};
+
+    const json: MicrolinkResponse = await res.json();
+    if (json.status !== "success" || !json.data) return {};
+
+    const title = json.data.title ?? undefined;
+    const imageUrl = json.data.image?.url ?? undefined;
+
+    return {
+      title: title || undefined,
+      imageUrl: imageUrl || undefined,
+    };
   } catch {
-    return null;
+    return {};
   }
 }
+
+/* ─── Main export ───────────────────────────────────────── */
 
 export async function fetchVideoMetadata(
   url: string,
   platform: "youtube" | "tiktok" | "instagram" | "facebook"
 ): Promise<VideoMetadata> {
+
   if (platform === "youtube") {
+    /* YouTube: thumbnail is always available directly (no CORS).
+       Use microlink for title — it's CORS-safe. */
     const videoId = extractYoutubeId(url);
-    if (!videoId) return {};
+    const thumbnailUrl = videoId ? getYoutubeThumbnail(videoId) : undefined;
 
-    const thumbnailUrl = getYoutubeThumbnail(videoId);
-
-    let title: string | undefined;
-    try {
-      const res = await safeFetch(
-        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
-      );
-      if (res && res.ok) {
-        const data = await res.json();
-        title = data.title as string | undefined;
-      }
-    } catch {}
+    const { title } = await fetchMicrolinkMeta(url);
 
     return { thumbnailUrl, title };
   }
 
-  if (platform === "tiktok") {
-    try {
-      const res = await safeFetch(
-        `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`
-      );
-      if (res && res.ok) {
-        const data = await res.json();
-        return {
-          thumbnailUrl: data.thumbnail_url as string | undefined,
-          title: data.title as string | undefined,
-        };
-      }
-    } catch {}
-    return {};
-  }
-
-  return {};
+  /* TikTok, Instagram, Facebook — fully via microlink */
+  const { title, imageUrl } = await fetchMicrolinkMeta(url);
+  return { title, thumbnailUrl: imageUrl };
 }
