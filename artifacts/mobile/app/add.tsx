@@ -148,33 +148,68 @@ export default function AddScreen() {
       setPreviewImgError(false);
       return;
     }
+
+    const isPinterest = detectedPlatform === "pinterest";
+
     setMetaLoading(true);
-    setFetchedMeta(null);
     setPreviewImgError(false);
+
+    /* ── Pinterest: apply fallback immediately so UI is NEVER blank ── */
+    if (isPinterest) {
+      setFetchedMeta({ title: "Saved from Pinterest" });
+    } else {
+      setFetchedMeta(null);
+    }
+
     let cancelled = false;
+
     const timer = setTimeout(async () => {
-      const meta = await fetchVideoMetadata(normalizeUrl(url), detectedPlatform);
+      /* Race the actual fetch against a hard timeout */
+      const TIMEOUT_MS = isPinterest ? 3000 : 9000;
+      const timeoutPromise = new Promise<VideoMetadata>((resolve) =>
+        setTimeout(() => {
+          console.log("[Vexo] Metadata fetch timed out for", detectedPlatform);
+          resolve(isPinterest ? { title: "Saved from Pinterest" } : {});
+        }, TIMEOUT_MS)
+      );
+
+      let meta: VideoMetadata = isPinterest ? { title: "Saved from Pinterest" } : {};
+      try {
+        meta = await Promise.race([
+          fetchVideoMetadata(normalizeUrl(url), detectedPlatform),
+          timeoutPromise,
+        ]);
+        console.log("[Vexo] Metadata fetched:", detectedPlatform, "title:", meta.title, "thumb:", !!meta.thumbnailUrl);
+      } catch (err) {
+        console.log("[Vexo] Pinterest metadata fetch failed:", err, "— Fallback activated");
+        if (isPinterest) meta = { title: "Saved from Pinterest" };
+      }
+
       if (!cancelled) {
-        setFetchedMeta(meta);
+        /* Merge with existing fallback — never downgrade a title we already set */
+        setFetchedMeta((prev) => ({
+          thumbnailUrl: meta.thumbnailUrl || prev?.thumbnailUrl,
+          title: meta.title || prev?.title,
+        }));
         setMetaLoading(false);
-        /* Auto-fill title if:
-           - metadata has a title, AND
-           - user hasn't manually typed a different title (or title is still empty) */
-        if (meta.title) {
+
+        const finalTitle = meta.title;
+        if (finalTitle) {
           setTitle((current) => {
             const shouldFill =
               !userTypedTitle.current ||
               current === "" ||
               current === lastAutoFilledTitle.current;
             if (shouldFill) {
-              lastAutoFilledTitle.current = meta.title!;
-              return meta.title!;
+              lastAutoFilledTitle.current = finalTitle;
+              return finalTitle;
             }
             return current;
           });
         }
       }
     }, 600);
+
     return () => {
       cancelled = true;
       clearTimeout(timer);

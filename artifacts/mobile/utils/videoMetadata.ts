@@ -25,7 +25,7 @@ export function getYoutubeThumbnail(videoId: string): string {
 
 /* ─── Helper: abort-safe fetch with timeout ─────────────── */
 
-async function timedFetch(url: string, ms = 8000): Promise<Response | null> {
+async function timedFetch(url: string, ms = 5000): Promise<Response | null> {
   try {
     const ctrl = new AbortController();
     const id = setTimeout(() => ctrl.abort(), ms);
@@ -126,53 +126,64 @@ async function resolvePinIt(url: string): Promise<string> {
 
 /* ─── Pinterest main fetch ───────────────────────────────── */
 /*
- * Strategy (all fired as fast as possible):
- *   Round 1 — three sources in parallel with the original URL
- *   Round 2 — if pin.it resolved to a different URL AND round 1
- *             yielded no image, run oEmbed + Microlink again with
- *             the resolved canonical URL
- *   Fallback — title: "Saved from Pinterest", thumbnail: undefined
- *             (VideoCard has a styled placeholder for missing thumbnails)
+ * Strategy:
+ *   Round 1 — fire 3 CORS-safe sources + redirect resolution in parallel
+ *   Round 2 — if pin.it resolved AND we still lack title/image, retry
+ *   Fallback — title "Saved from Pinterest" is ALWAYS returned;
+ *              VideoCard has a styled placeholder for missing thumbnails
+ *
+ * The entire function is wrapped in try/catch so it can never throw —
+ * the caller in add.tsx always gets a usable VideoMetadata object.
  */
 
 async function fetchPinterestMeta(url: string): Promise<VideoMetadata> {
-  /* Fire all three CORS-safe sources in parallel right away */
-  const [oembedRes, mlRes, noembedRes, resolvedUrl] = await Promise.all([
-    fetchPinterestOembed(url),
-    fetchMicrolink(url),
-    fetchNoembed(url),
-    resolvePinIt(url),             /* also runs in parallel */
-  ]);
-
-  /* Merge round-1 results */
-  let title =
-    oembedRes.title ||
-    mlRes.title ||
-    noembedRes.title ||
-    mlRes.description?.slice(0, 100) ||
-    undefined;
-
-  let thumbnailUrl =
-    oembedRes.thumbnailUrl ||
-    noembedRes.thumbnailUrl ||
-    mlRes.imageUrl ||
-    undefined;
-
-  /* Round 2: if pin.it resolved and we still lack data, retry with canonical URL */
-  if (resolvedUrl !== url && (!title || !thumbnailUrl)) {
-    const [oe2, ml2] = await Promise.all([
-      fetchPinterestOembed(resolvedUrl),
-      fetchMicrolink(resolvedUrl),
+  try {
+    /* Fire all CORS-safe sources in parallel */
+    const [oembedRes, mlRes, noembedRes, resolvedUrl] = await Promise.all([
+      fetchPinterestOembed(url).catch(() => ({})),
+      fetchMicrolink(url).catch(() => ({})),
+      fetchNoembed(url).catch(() => ({})),
+      resolvePinIt(url).catch(() => url),
     ]);
-    if (!title) title = oe2.title || ml2.title || ml2.description?.slice(0, 100);
-    if (!thumbnailUrl) thumbnailUrl = oe2.thumbnailUrl || ml2.imageUrl;
-  }
 
-  /* Guaranteed fallbacks — always return something useful */
-  return {
-    title: title || "Saved from Pinterest",
-    thumbnailUrl,
-  };
+    let title =
+      (oembedRes as any).title ||
+      (mlRes as any).title ||
+      (noembedRes as any).title ||
+      (mlRes as any).description?.slice(0, 100) ||
+      undefined;
+
+    let thumbnailUrl =
+      (oembedRes as any).thumbnailUrl ||
+      (noembedRes as any).thumbnailUrl ||
+      (mlRes as any).imageUrl ||
+      undefined;
+
+    /* Round 2: resolved URL gave us a canonical link — retry if still missing data */
+    const resolved = resolvedUrl as string;
+    if (resolved !== url && (!title || !thumbnailUrl)) {
+      const [oe2, ml2] = await Promise.all([
+        fetchPinterestOembed(resolved).catch(() => ({})),
+        fetchMicrolink(resolved).catch(() => ({})),
+      ]);
+      if (!title) {
+        title = (oe2 as any).title || (ml2 as any).title || (ml2 as any).description?.slice(0, 100);
+      }
+      if (!thumbnailUrl) {
+        thumbnailUrl = (oe2 as any).thumbnailUrl || (ml2 as any).imageUrl;
+      }
+    }
+
+    console.log("[Vexo] fetchPinterestMeta result — title:", title, "thumb:", !!thumbnailUrl);
+
+    return {
+      title: title || "Saved from Pinterest",
+      thumbnailUrl,
+    };
+  } catch (err) {
+    console.log("[Vexo] fetchPinterestMeta threw:", err, "— using fallback");
+    return { title: "Saved from Pinterest" };
+  }
 }
 
 /* ─── Main export ─────────────────────────────────────────── */
