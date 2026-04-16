@@ -18,7 +18,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useSavedItems } from "@/contexts/SavedItemsContext";
-import { fetchVideoMetadata, VideoMetadata } from "@/utils/videoMetadata";
+import {
+  extractYoutubeId,
+  fetchVideoMetadata,
+  getYoutubeThumbnail,
+  VideoMetadata,
+} from "@/utils/videoMetadata";
 
 const BG = "#060814";
 const SURFACE = "#0B1020";
@@ -154,8 +159,19 @@ export default function AddScreen() {
     setMetaLoading(true);
     setPreviewImgError(false);
 
-    /* ── Pinterest: apply fallback immediately so UI is NEVER blank ── */
-    if (isPinterest) {
+    /* ── YouTube: compute thumbnail INSTANTLY from the URL — no network needed ── */
+    if (detectedPlatform === "youtube") {
+      const videoId = extractYoutubeId(normalizeUrl(url));
+      if (videoId) {
+        setFetchedMeta((prev) => ({
+          title: prev?.title,
+          thumbnailUrl: prev?.thumbnailUrl || getYoutubeThumbnail(videoId),
+        }));
+      } else {
+        setFetchedMeta(null);
+      }
+    } else if (isPinterest) {
+      /* ── Pinterest: apply fallback immediately so UI is NEVER blank ── */
       setFetchedMeta({ title: "Saved from Pinterest" });
     } else {
       setFetchedMeta(null);
@@ -238,6 +254,14 @@ export default function AddScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    /* Guarantee a YouTube thumbnail even if the async fetch hasn't resolved yet */
+    let thumbnailUrl = fetchedMeta?.thumbnailUrl;
+    if (!thumbnailUrl && detectedPlatform === "youtube") {
+      const videoId = extractYoutubeId(normalizeUrl(url));
+      if (videoId) thumbnailUrl = getYoutubeThumbnail(videoId);
+    }
+
     addItem({
       url: normalizeUrl(url),
       title: title.trim(),
@@ -245,7 +269,7 @@ export default function AddScreen() {
       category: selectedCategory,
       notes: notes.trim(),
       thumbnailColor: "#8B5CF6",
-      thumbnailUrl: fetchedMeta?.thumbnailUrl,
+      thumbnailUrl,
       reminder,
     });
     router.back();

@@ -1,5 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+
+import {
+  extractYoutubeId,
+  fetchVideoMetadata,
+  getYoutubeThumbnail,
+} from "../utils/videoMetadata";
 
 export interface SavedItem {
   id: string;
@@ -166,9 +172,11 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   const [items, setItems] = useState<SavedItem[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [loaded, setLoaded] = useState(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     loadData();
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -189,13 +197,68 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         AsyncStorage.getItem(ITEMS_KEY),
         AsyncStorage.getItem(CATEGORIES_KEY),
       ]);
-      setItems(storedItems ? JSON.parse(storedItems) : SAMPLE_ITEMS);
+      const loadedItems: SavedItem[] = storedItems ? JSON.parse(storedItems) : SAMPLE_ITEMS;
+      setItems(loadedItems);
       setCategories(storedCategories ? JSON.parse(storedCategories) : DEFAULT_CATEGORIES);
+      /* Repair missing thumbnails in the background — never blocks the UI */
+      repairMissingThumbnails(loadedItems);
     } catch {
       setItems(SAMPLE_ITEMS);
       setCategories(DEFAULT_CATEGORIES);
+      repairMissingThumbnails(SAMPLE_ITEMS);
     }
     setLoaded(true);
+  }
+
+  /**
+   * Background repair: for each item missing a thumbnailUrl:
+   *   - YouTube → compute instantly from video ID (no network)
+   *   - Others  → try a single Microlink/noembed fetch, throttled
+   * Updates are applied via setItems so they persist automatically.
+   */
+  async function repairMissingThumbnails(loadedItems: SavedItem[]) {
+    const missing = loadedItems.filter((item) => !item.thumbnailUrl);
+    if (missing.length === 0) return;
+
+    /* ── Pass 1: YouTube — instant, no network ── */
+    const ytFixes: Record<string, string> = {};
+    for (const item of missing) {
+      if (item.platform === "youtube") {
+        const videoId = extractYoutubeId(item.url);
+        if (videoId) ytFixes[item.id] = getYoutubeThumbnail(videoId);
+      }
+    }
+    if (Object.keys(ytFixes).length > 0 && mountedRef.current) {
+      setItems((prev) =>
+        prev.map((item) =>
+          ytFixes[item.id] ? { ...item, thumbnailUrl: ytFixes[item.id] } : item
+        )
+      );
+    }
+
+    /* ── Pass 2: other platforms — network, max 5, sequential ── */
+    const networkItems = missing
+      .filter((item) => item.platform !== "youtube" && !ytFixes[item.id])
+      .slice(0, 5);
+
+    for (const item of networkItems) {
+      if (!mountedRef.current) break;
+      try {
+        /* Small delay so we don't hammer APIs on startup */
+        await new Promise((r) => setTimeout(r, 800));
+        if (!mountedRef.current) break;
+        const meta = await fetchVideoMetadata(item.url, item.platform);
+        if (meta.thumbnailUrl && mountedRef.current) {
+          setItems((prev) =>
+            prev.map((p) =>
+              p.id === item.id ? { ...p, thumbnailUrl: meta.thumbnailUrl } : p
+            )
+          );
+        }
+      } catch {
+        /* silently ignore — fallback card UI handles no-thumbnail gracefully */
+      }
+    }
   }
 
   const addItem = useCallback((item: Omit<SavedItem, "id" | "createdAt">) => {
