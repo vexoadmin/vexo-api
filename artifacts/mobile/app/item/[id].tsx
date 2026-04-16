@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-import { useSavedItems } from "@/contexts/SavedItemsContext";
+import { useSavedItems, Category } from "@/contexts/SavedItemsContext";
 
 function normalizeUrl(url: string): string {
   if (!url) return url;
@@ -102,15 +102,25 @@ export default function ItemDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { items, updateItem, deleteItem } = useSavedItems();
+  const { items, categories, updateItem, deleteItem } = useSavedItems();
 
   const item = items.find((i) => i.id === id);
+  const [thumbError, setThumbError] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
+  /* ── Edit mode ── */
+  const [editMode, setEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState(item?.title || "");
+  const [editCategory, setEditCategory] = useState(item?.category || "");
+  const [editNotes, setEditNotes] = useState(item?.notes || "");
+  const [editReminder, setEditReminder] = useState<number | undefined>(item?.reminder);
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+
+  /* ── Notes inline (view-mode only) ── */
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(item?.notes || "");
-  const [thumbError, setThumbError] = useState(false);
   const [editingReminder, setEditingReminder] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
 
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 20;
 
@@ -162,6 +172,37 @@ export default function ItemDetailScreen() {
         },
       },
     ]);
+  }
+
+  function handleEnterEdit() {
+    setEditTitle(item!.title);
+    setEditCategory(item!.category);
+    setEditNotes(item!.notes || "");
+    setEditReminder(item!.reminder);
+    setShowEditDatePicker(false);
+    setEditingNotes(false);
+    setEditingReminder(false);
+    setShowMenu(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditMode(true);
+  }
+
+  function handleSaveEdit() {
+    if (!editTitle.trim()) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    updateItem(item!.id, {
+      title: editTitle.trim(),
+      category: editCategory,
+      notes: editNotes.trim(),
+      reminder: editReminder,
+    });
+    setNotes(editNotes.trim());
+    setEditMode(false);
+  }
+
+  function handleCancelEdit() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditMode(false);
   }
 
   return (
@@ -245,18 +286,32 @@ export default function ItemDetailScreen() {
           {/* Title + date row */}
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.itemTitle}>{item.title}</Text>
+              {editMode ? (
+                <TextInput
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  style={styles.titleInput}
+                  placeholderTextColor="rgba(255,255,255,0.30)"
+                  placeholder="Title"
+                  autoFocus
+                  returnKeyType="done"
+                />
+              ) : (
+                <Text style={styles.itemTitle}>{item.title}</Text>
+              )}
               <Text style={styles.savedDate}>Saved on {formatDate(item.createdAt)}</Text>
             </View>
-            <Pressable
-              onPress={() => setShowMenu(!showMenu)}
-              style={styles.menuBtn}
-              hitSlop={8}
-            >
-              <Text style={styles.menuDots}>⋯</Text>
-            </Pressable>
+            {!editMode && (
+              <Pressable
+                onPress={() => setShowMenu(!showMenu)}
+                style={styles.menuBtn}
+                hitSlop={8}
+              >
+                <Text style={styles.menuDots}>⋯</Text>
+              </Pressable>
+            )}
           </View>
-          {showMenu && (
+          {showMenu && !editMode && (
             <Pressable onPress={handleDelete} style={styles.deleteRow}>
               <Feather name="trash-2" size={13} color="#EF4444" />
               <Text style={styles.deleteText}>Delete item</Text>
@@ -264,20 +319,69 @@ export default function ItemDetailScreen() {
           )}
         </View>
 
-        {/* ── 2. Notes ── */}
+        {/* ── 2. Edit mode: Category picker ── */}
+        {editMode && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabelUppercase}>CATEGORY</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+            >
+              {categories.map((cat: Category) => {
+                const selected = editCategory === cat.name;
+                return (
+                  <Pressable
+                    key={cat.name}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setEditCategory(cat.name);
+                    }}
+                    style={[
+                      styles.catChip,
+                      selected && {
+                        backgroundColor: cat.color + "22",
+                        borderColor: cat.color + "70",
+                      },
+                    ]}
+                  >
+                    <Text style={styles.catChipIcon}>{cat.icon}</Text>
+                    <Text style={[styles.catChipText, selected && { color: cat.color }]}>
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── 3. Notes ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardLabel}>Personal note</Text>
-            <Pressable
-              onPress={() => { if (editingNotes) handleSaveNotes(); else setEditingNotes(true); }}
-              style={[styles.smallBtn, editingNotes && styles.smallBtnActive]}
-            >
-              <Text style={[styles.smallBtnText, editingNotes && { color: "#fff" }]}>
-                {editingNotes ? "Save" : "Edit"}
-              </Text>
-            </Pressable>
+            {!editMode && (
+              <Pressable
+                onPress={() => { if (editingNotes) handleSaveNotes(); else setEditingNotes(true); }}
+                style={[styles.smallBtn, editingNotes && styles.smallBtnActive]}
+              >
+                <Text style={[styles.smallBtnText, editingNotes && { color: "#fff" }]}>
+                  {editingNotes ? "Save" : "Edit"}
+                </Text>
+              </Pressable>
+            )}
           </View>
-          {editingNotes ? (
+          {editMode ? (
+            <TextInput
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder="Write your thoughts..."
+              placeholderTextColor="rgba(255,255,255,0.25)"
+              style={styles.notesInput}
+              multiline
+              textAlignVertical="top"
+            />
+          ) : editingNotes ? (
             <TextInput
               value={notes}
               onChangeText={setNotes}
@@ -295,44 +399,117 @@ export default function ItemDetailScreen() {
           )}
         </View>
 
-        {/* ── 3. Reminder ── */}
+        {/* ── 4. Reminder ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardLabel}>Reminder</Text>
-            {hasReminder && !editingReminder && (
-              <View style={styles.reminderActiveBadge}>
-                <Text style={styles.reminderActiveBadgeText}>Active</Text>
-              </View>
-            )}
-            {hasReminder && !editingReminder && (
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                <Pressable onPress={() => setEditingReminder(true)} style={styles.smallBtn}>
-                  <Text style={styles.smallBtnText}>Edit</Text>
-                </Pressable>
-                <Pressable onPress={handleClearReminder} style={[styles.smallBtn, { borderColor: "rgba(239,68,68,0.30)" }]}>
-                  <Text style={[styles.smallBtnText, { color: "#EF4444" }]}>Remove</Text>
-                </Pressable>
-              </View>
-            )}
-            {editingReminder && (
-              <Pressable onPress={() => { setEditingReminder(false); setShowDatePicker(false); }} hitSlop={8}>
-                <Feather name="x" size={16} color="rgba(255,255,255,0.35)" />
-              </Pressable>
+            {editMode ? (
+              /* Edit mode: reminder state is editReminder */
+              editReminder && editReminder > Date.now() ? (
+                <>
+                  <View style={styles.reminderActiveBadge}>
+                    <Text style={styles.reminderActiveBadgeText}>Active</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setEditReminder(undefined)}
+                    style={[styles.smallBtn, { borderColor: "rgba(239,68,68,0.30)" }]}
+                  >
+                    <Text style={[styles.smallBtnText, { color: "#EF4444" }]}>Remove</Text>
+                  </Pressable>
+                </>
+              ) : null
+            ) : (
+              /* View mode */
+              <>
+                {hasReminder && !editingReminder && (
+                  <View style={styles.reminderActiveBadge}>
+                    <Text style={styles.reminderActiveBadgeText}>Active</Text>
+                  </View>
+                )}
+                {hasReminder && !editingReminder && (
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <Pressable onPress={() => setEditingReminder(true)} style={styles.smallBtn}>
+                      <Text style={styles.smallBtnText}>Edit</Text>
+                    </Pressable>
+                    <Pressable onPress={handleClearReminder} style={[styles.smallBtn, { borderColor: "rgba(239,68,68,0.30)" }]}>
+                      <Text style={[styles.smallBtnText, { color: "#EF4444" }]}>Remove</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {editingReminder && (
+                  <Pressable onPress={() => { setEditingReminder(false); setShowDatePicker(false); }} hitSlop={8}>
+                    <Feather name="x" size={16} color="rgba(255,255,255,0.35)" />
+                  </Pressable>
+                )}
+              </>
             )}
           </View>
 
-          {hasReminder && !editingReminder && (
-            <Text style={styles.reminderText}>🔔 {formatReminder(item.reminder!)}</Text>
+          {/* Edit mode reminder body */}
+          {editMode && (
+            <View style={{ gap: 8 }}>
+              {editReminder && editReminder > Date.now() && (
+                <Text style={styles.reminderText}>🔔 {formatReminder(editReminder)}</Text>
+              )}
+              <View style={styles.quickChips}>
+                {REMINDER_QUICK.map((opt) => (
+                  <Pressable
+                    key={opt.label}
+                    onPress={() => {
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      setEditReminder(opt.getValue());
+                    }}
+                    style={styles.quickChip}
+                  >
+                    <Text style={styles.quickChipText}>{opt.label}</Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => setShowEditDatePicker(!showEditDatePicker)}
+                  style={[styles.quickChip, showEditDatePicker && styles.quickChipActive]}
+                >
+                  <Feather name="calendar" size={12} color={showEditDatePicker ? "#A5F3FC" : "rgba(255,255,255,0.45)"} />
+                  <Text style={[styles.quickChipText, showEditDatePicker && { color: "#A5F3FC" }]}>
+                    Custom date
+                  </Text>
+                </Pressable>
+                {(editReminder && editReminder > Date.now()) ? null : (
+                  <Pressable
+                    onPress={() => setEditReminder(undefined)}
+                    style={styles.quickChip}
+                  >
+                    <Text style={[styles.quickChipText, { color: "rgba(255,255,255,0.35)" }]}>None</Text>
+                  </Pressable>
+                )}
+              </View>
+              {showEditDatePicker && Platform.OS !== "web" && (
+                <DateTimePicker
+                  value={editReminder ? new Date(editReminder) : new Date(Date.now() + 86400000)}
+                  mode="date"
+                  minimumDate={new Date()}
+                  onChange={(_, date) => {
+                    if (date) {
+                      setEditReminder(date.getTime());
+                      setShowEditDatePicker(false);
+                    }
+                  }}
+                  themeVariant="dark"
+                />
+              )}
+            </View>
           )}
 
-          {!hasReminder && !editingReminder && (
+          {/* View mode reminder body */}
+          {!editMode && hasReminder && !editingReminder && (
+            <Text style={styles.reminderText}>🔔 {formatReminder(item.reminder!)}</Text>
+          )}
+          {!editMode && !hasReminder && !editingReminder && (
             <Pressable onPress={() => setEditingReminder(true)} style={styles.addReminderBtn}>
               <Feather name="plus" size={14} color="#A5F3FC" />
               <Text style={styles.addReminderText}>Add reminder</Text>
             </Pressable>
           )}
-
-          {editingReminder && (
+          {!editMode && editingReminder && (
             <View style={{ gap: 8 }}>
               <View style={styles.quickChips}>
                 {REMINDER_QUICK.map((opt) => (
@@ -369,25 +546,45 @@ export default function ItemDetailScreen() {
           )}
         </View>
 
-        {/* ── 4. Action buttons — Edit item + Open source ── */}
-        <View style={styles.actionsRow}>
-          <Pressable
-            onPress={() => setEditingNotes(!editingNotes)}
-            style={styles.editBtn}
-          >
-            <Text style={styles.editBtnText}>Edit item</Text>
-          </Pressable>
-          <Pressable onPress={handleOpenLink} style={[styles.openBtn, { flex: 1 }]}>
-            <LinearGradient
-              colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.openBtnGrad}
+        {/* ── 5. Action buttons ── */}
+        {editMode ? (
+          <View style={styles.actionsRow}>
+            <Pressable onPress={handleCancelEdit} style={styles.editBtn}>
+              <Text style={styles.editBtnText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleSaveEdit}
+              style={[styles.openBtn, { flex: 1, opacity: editTitle.trim() ? 1 : 0.4 }]}
             >
-              <Text style={styles.openBtnText}>Open source ↗</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
+              <LinearGradient
+                colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.openBtnGrad}
+              >
+                <Feather name="check" size={15} color="#fff" />
+                <Text style={styles.openBtnText}>Save changes</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.actionsRow}>
+            <Pressable onPress={handleEnterEdit} style={styles.editBtn}>
+              <Feather name="edit-2" size={14} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </Pressable>
+            <Pressable onPress={handleOpenLink} style={[styles.openBtn, { flex: 1 }]}>
+              <LinearGradient
+                colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.openBtnGrad}
+              >
+                <Text style={styles.openBtnText}>Open source ↗</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        )}
 
         {/* ── 5. AI Future area ── */}
         <View style={styles.aiArea}>
@@ -663,19 +860,56 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: "rgba(255,255,255,0.04)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   editBtnText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: "rgba(255,255,255,0.85)",
+  },
+  titleInput: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
+    color: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(139,92,246,0.55)",
+    paddingBottom: 4,
+    paddingTop: 0,
+  },
+  cardLabelUppercase: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.40)",
+    letterSpacing: 1.0,
+  },
+  catChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  catChipIcon: {
+    fontSize: 13,
+  },
+  catChipText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.70)",
   },
   openBtn: {
     borderRadius: 18,
