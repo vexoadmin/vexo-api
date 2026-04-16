@@ -56,6 +56,11 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   const thumbHeight = isLarge ? 200 : 136;
   const [thumbError, setThumbError] = useState(false);
 
+  /* Reset error state whenever the thumbnail URL changes (e.g. after background repair) */
+  React.useEffect(() => {
+    setThumbError(false);
+  }, [item.thumbnailUrl]);
+
   const platformColor = PLATFORM_COLORS[item.platform] ?? "#8B5CF6";
   const platformIcon = PLATFORM_ICONS[item.platform] ?? "link";
   const domain = extractDomain(item.url);
