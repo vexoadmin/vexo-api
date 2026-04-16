@@ -11,6 +11,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: "TikTok",
   instagram: "Instagram",
   facebook: "Facebook",
+  website: "Website",
 };
 
 const PLATFORM_ICONS: Record<string, string> = {
@@ -18,6 +19,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   tiktok: "video",
   instagram: "camera",
   facebook: "users",
+  website: "globe",
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -25,6 +27,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   tiktok: "#22D3EE",
   instagram: "#D946EF",
   facebook: "#8B5CF6",
+  website: "#6366F1",
 };
 
 const BORDER = "rgba(255,255,255,0.10)";

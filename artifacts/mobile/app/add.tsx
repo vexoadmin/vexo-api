@@ -24,45 +24,63 @@ const BG = "#060814";
 const SURFACE = "#0B1020";
 const BORDER = "rgba(255,255,255,0.10)";
 
+type PlatformType = "youtube" | "tiktok" | "instagram" | "facebook" | "website";
+
 const PLATFORM_COLORS: Record<string, string> = {
   youtube: "#EF4444",
   tiktok: "#22D3EE",
   instagram: "#D946EF",
   facebook: "#8B5CF6",
+  website: "#6366F1",
 };
 const PLATFORM_ICONS: Record<string, string> = {
   youtube: "play-circle",
   tiktok: "video",
   instagram: "camera",
   facebook: "users",
+  website: "globe",
 };
 const PLATFORM_NAMES: Record<string, string> = {
   youtube: "YouTube",
   tiktok: "TikTok",
   instagram: "Instagram",
   facebook: "Facebook",
+  website: "Website",
 };
 const PLATFORM_DESC: Record<string, string> = {
-  youtube: "YouTube video detected",
-  tiktok: "TikTok video detected",
-  instagram: "Instagram reel detected",
-  facebook: "Facebook video detected",
+  youtube: "YouTube video",
+  tiktok: "TikTok video",
+  instagram: "Instagram post",
+  facebook: "Facebook video",
+  website: "Web page",
 };
-
-function detectPlatform(url: string): "youtube" | "tiktok" | "instagram" | "facebook" | null {
-  const lower = url.toLowerCase();
-  if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
-  if (lower.includes("tiktok.com")) return "tiktok";
-  if (lower.includes("instagram.com")) return "instagram";
-  if (lower.includes("facebook.com") || lower.includes("fb.watch") || lower.includes("fb.com")) return "facebook";
-  return null;
-}
 
 function normalizeUrl(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return trimmed;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return "https://" + trimmed;
+}
+
+function isValidUrl(url: string): boolean {
+  try {
+    const u = new URL(normalizeUrl(url));
+    return u.hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
+function detectPlatform(url: string): PlatformType | null {
+  if (!url.trim()) return null;
+  const lower = url.toLowerCase();
+  if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
+  if (lower.includes("tiktok.com")) return "tiktok";
+  if (lower.includes("instagram.com")) return "instagram";
+  if (lower.includes("facebook.com") || lower.includes("fb.watch") || lower.includes("fb.com")) return "facebook";
+  /* Any other syntactically valid URL → generic website */
+  if (isValidUrl(url)) return "website";
+  return null;
 }
 
 function extractDomain(url: string): string {
@@ -158,16 +176,16 @@ export default function AddScreen() {
   function handleSave() {
     let valid = true;
     if (!url.trim()) {
-      setUrlError("Please paste a video link before saving");
+      setUrlError("Please paste a link before saving");
       valid = false;
-    } else if (!detectedPlatform) {
-      setUrlError("Link must be from YouTube, TikTok, Instagram, or Facebook");
+    } else if (!isValidUrl(url)) {
+      setUrlError("That doesn't look like a valid URL");
       valid = false;
     } else {
       setUrlError("");
     }
     if (!title.trim()) {
-      setTitleError("Please enter a title before saving");
+      setTitleError("Please add a title before saving");
       valid = false;
     } else {
       setTitleError("");
@@ -180,7 +198,7 @@ export default function AddScreen() {
     addItem({
       url: normalizeUrl(url),
       title: title.trim(),
-      platform: detectedPlatform,
+      platform: detectedPlatform ?? "website",
       category: selectedCategory,
       notes: notes.trim(),
       thumbnailColor: "#8B5CF6",
@@ -232,7 +250,7 @@ export default function AddScreen() {
             <TextInput
               value={url}
               onChangeText={(t) => { setUrl(t); if (urlError) setUrlError(""); }}
-              placeholder="Paste YouTube, TikTok, or Instagram link"
+              placeholder="Paste any link — YouTube, article, recipe…"
               placeholderTextColor="rgba(255,255,255,0.28)"
               style={styles.inputText}
               autoCapitalize="none"

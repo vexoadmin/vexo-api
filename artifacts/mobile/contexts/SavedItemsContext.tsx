@@ -5,7 +5,7 @@ export interface SavedItem {
   id: string;
   url: string;
   title: string;
-  platform: "tiktok" | "instagram" | "youtube" | "facebook";
+  platform: "tiktok" | "instagram" | "youtube" | "facebook" | "website";
   category: string;
   notes: string;
   thumbnailColor: string;

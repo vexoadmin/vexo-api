@@ -80,13 +80,19 @@ async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?:
 
 export async function fetchVideoMetadata(
   url: string,
-  platform: "youtube" | "tiktok" | "instagram" | "facebook"
+  platform: string
 ): Promise<VideoMetadata> {
   /* YouTube: always build the direct thumbnail immediately (no network needed) */
   const videoId = platform === "youtube" ? extractYoutubeId(url) : null;
   const ytThumbnail = videoId ? getYoutubeThumbnail(videoId) : undefined;
 
-  /* Fire both metadata sources in parallel for speed */
+  /* Generic websites: only microlink works (noembed only handles embeds) */
+  if (platform === "website") {
+    const ml = await fetchMicrolink(url);
+    return { title: ml.title, thumbnailUrl: ml.imageUrl };
+  }
+
+  /* Social platforms: fire both in parallel for speed */
   const [noembedResult, mlResult] = await Promise.allSettled([
     fetchNoembed(url),
     fetchMicrolink(url),
