@@ -5,7 +5,6 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Platform,
   Pressable,
@@ -86,6 +85,8 @@ export default function AddScreen() {
   const [fetchedMeta, setFetchedMeta] = useState<VideoMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(false);
   const userTypedTitle = useRef(false);
+  const [urlError, setUrlError] = useState("");
+  const [titleError, setTitleError] = useState("");
 
   const detectedPlatform = detectPlatform(url);
   const platformColor = detectedPlatform ? PLATFORM_COLORS[detectedPlatform] : null;
@@ -117,9 +118,26 @@ export default function AddScreen() {
   }, [url, detectedPlatform]);
 
   function handleSave() {
-    if (!url.trim()) { Alert.alert("Missing URL", "Please enter a video link"); return; }
-    if (!title.trim()) { Alert.alert("Missing Title", "Please enter a title"); return; }
-    if (!detectedPlatform) { Alert.alert("Invalid Link", "Please enter a YouTube, TikTok, or Instagram link"); return; }
+    let valid = true;
+    if (!url.trim()) {
+      setUrlError("Please paste a video link before saving");
+      valid = false;
+    } else if (!detectedPlatform) {
+      setUrlError("Link must be from YouTube, TikTok, or Instagram");
+      valid = false;
+    } else {
+      setUrlError("");
+    }
+    if (!title.trim()) {
+      setTitleError("Please enter a title before saving");
+      valid = false;
+    } else {
+      setTitleError("");
+    }
+    if (!valid) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addItem({
       url: normalizeUrl(url),
@@ -164,11 +182,18 @@ export default function AddScreen() {
         {/* ── 1. Video Link ── */}
         <View style={styles.section}>
           <Text style={styles.label}>VIDEO LINK</Text>
-          <View style={[styles.inputRow, detectedPlatform && { borderColor: platformColor! + "40" }]}>
-            <Feather name="link-2" size={15} color={platformColor || "rgba(255,255,255,0.28)"} />
+          <View style={[
+            styles.inputRow,
+            urlError ? styles.inputRowError : detectedPlatform ? { borderColor: platformColor! + "40" } : null,
+          ]}>
+            <Feather
+              name={urlError ? "alert-circle" : "link-2"}
+              size={15}
+              color={urlError ? "#F87171" : (platformColor || "rgba(255,255,255,0.28)")}
+            />
             <TextInput
               value={url}
-              onChangeText={setUrl}
+              onChangeText={(t) => { setUrl(t); if (urlError) setUrlError(""); }}
               placeholder="Paste YouTube, TikTok, or Instagram link"
               placeholderTextColor="rgba(255,255,255,0.28)"
               style={styles.inputText}
@@ -176,6 +201,12 @@ export default function AddScreen() {
               keyboardType="url"
             />
           </View>
+          {!!urlError && (
+            <View style={styles.errorRow}>
+              <Feather name="alert-circle" size={12} color="#F87171" />
+              <Text style={styles.errorText}>{urlError}</Text>
+            </View>
+          )}
         </View>
 
         {/* ── 2. Preview Card ── */}
@@ -255,11 +286,17 @@ export default function AddScreen() {
           <Text style={styles.label}>TITLE</Text>
           <TextInput
             value={title}
-            onChangeText={(t) => { setTitle(t); userTypedTitle.current = true; }}
+            onChangeText={(t) => { setTitle(t); userTypedTitle.current = true; if (titleError) setTitleError(""); }}
             placeholder="Give it a memorable title"
             placeholderTextColor="rgba(255,255,255,0.28)"
-            style={styles.input}
+            style={[styles.input, titleError ? styles.inputError : null]}
           />
+          {!!titleError && (
+            <View style={styles.errorRow}>
+              <Feather name="alert-circle" size={12} color="#F87171" />
+              <Text style={styles.errorText}>{titleError}</Text>
+            </View>
+          )}
         </View>
 
         {/* ── 4. Category ── */}
@@ -397,6 +434,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 16, paddingVertical: 14, gap: 10,
   },
+  inputRowError: {
+    borderColor: "rgba(248,113,113,0.55)",
+    backgroundColor: "rgba(248,113,113,0.05)",
+  },
   inputText: {
     flex: 1, fontSize: 15, fontFamily: "Inter_400Regular",
     color: "#FFFFFF", paddingVertical: 0,
@@ -406,6 +447,22 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE, borderRadius: 18, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: 16, paddingVertical: 14, fontSize: 15,
     fontFamily: "Inter_400Regular", color: "#FFFFFF",
+  },
+  inputError: {
+    borderColor: "rgba(248,113,113,0.55)",
+    backgroundColor: "rgba(248,113,113,0.05)",
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#F87171",
+    flex: 1,
   },
 
   textArea: {
