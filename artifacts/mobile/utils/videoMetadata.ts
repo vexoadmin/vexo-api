@@ -3,7 +3,7 @@ export interface VideoMetadata {
   title?: string;
 }
 
-/* ─── YouTube helpers (no CORS needed) ─────────────────── */
+/* ─── YouTube direct thumbnail (always available, no CORS) ── */
 
 export function extractYoutubeId(url: string): string | null {
   const patterns = [
@@ -23,65 +23,83 @@ export function getYoutubeThumbnail(videoId: string): string {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
-/* ─── Microlink — CORS-safe OG metadata for all platforms ─ */
+/* ─── Helper: abort-safe fetch with timeout ─────────────── */
 
-interface MicrolinkResponse {
-  status: "success" | "error" | "fail";
-  data?: {
-    title?: string | null;
-    description?: string | null;
-    image?: { url?: string | null } | null;
-    logo?: { url?: string | null } | null;
-  };
+async function timedFetch(url: string, ms = 6000): Promise<Response | null> {
+  try {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(id);
+    return res;
+  } catch {
+    return null;
+  }
 }
 
-async function fetchMicrolinkMeta(url: string): Promise<{ title?: string; imageUrl?: string }> {
+/* ─── Source 1: noembed.com — CORS-safe oEmbed aggregator ── */
+/* Works for: YouTube, TikTok, Vimeo, and many others       */
+
+async function fetchNoembed(url: string): Promise<{ title?: string; thumbnailUrl?: string }> {
+  const res = await timedFetch(
+    `https://noembed.com/embed?url=${encodeURIComponent(url)}`
+  );
+  if (!res || !res.ok) return {};
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-
-    const res = await fetch(
-      `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=false`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timeout);
-
-    if (!res.ok) return {};
-
-    const json: MicrolinkResponse = await res.json();
-    if (json.status !== "success" || !json.data) return {};
-
-    const title = json.data.title ?? undefined;
-    const imageUrl = json.data.image?.url ?? undefined;
-
+    const data = await res.json();
+    if (data?.error) return {};
     return {
-      title: title || undefined,
-      imageUrl: imageUrl || undefined,
+      title: data.title || undefined,
+      thumbnailUrl: data.thumbnail_url || undefined,
     };
   } catch {
     return {};
   }
 }
 
-/* ─── Main export ───────────────────────────────────────── */
+/* ─── Source 2: Microlink — OG-tag extractor, all platforms ─ */
+
+async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?: string }> {
+  const res = await timedFetch(
+    `https://api.microlink.io/?url=${encodeURIComponent(url)}`
+  );
+  if (!res || !res.ok) return {};
+  try {
+    const json = await res.json();
+    if (json?.status !== "success" || !json.data) return {};
+    return {
+      title: json.data.title || undefined,
+      imageUrl: json.data.image?.url || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/* ─── Main export ─────────────────────────────────────────── */
 
 export async function fetchVideoMetadata(
   url: string,
   platform: "youtube" | "tiktok" | "instagram" | "facebook"
 ): Promise<VideoMetadata> {
+  /* YouTube: always build the direct thumbnail immediately (no network needed) */
+  const videoId = platform === "youtube" ? extractYoutubeId(url) : null;
+  const ytThumbnail = videoId ? getYoutubeThumbnail(videoId) : undefined;
 
-  if (platform === "youtube") {
-    /* YouTube: thumbnail is always available directly (no CORS).
-       Use microlink for title — it's CORS-safe. */
-    const videoId = extractYoutubeId(url);
-    const thumbnailUrl = videoId ? getYoutubeThumbnail(videoId) : undefined;
+  /* Fire both metadata sources in parallel for speed */
+  const [noembedResult, mlResult] = await Promise.allSettled([
+    fetchNoembed(url),
+    fetchMicrolink(url),
+  ]);
 
-    const { title } = await fetchMicrolinkMeta(url);
+  const noembed = noembedResult.status === "fulfilled" ? noembedResult.value : {};
+  const ml = mlResult.status === "fulfilled" ? mlResult.value : {};
 
-    return { thumbnailUrl, title };
-  }
+  /* Best title: noembed is more reliable for video platforms, ml covers the rest */
+  const title = noembed.title || ml.title || undefined;
 
-  /* TikTok, Instagram, Facebook — fully via microlink */
-  const { title, imageUrl } = await fetchMicrolinkMeta(url);
-  return { title, thumbnailUrl: imageUrl };
+  /* Best thumbnail: noembed > microlink > YouTube direct URL */
+  const thumbnailUrl = noembed.thumbnailUrl || ml.imageUrl || ytThumbnail || undefined;
+
+  return { title, thumbnailUrl };
 }

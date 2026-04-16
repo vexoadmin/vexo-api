@@ -99,12 +99,23 @@ export default function AddScreen() {
   const [fetchedMeta, setFetchedMeta] = useState<VideoMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(false);
   const userTypedTitle = useRef(false);
+  const lastAutoFilledTitle = useRef<string>("");
   const [urlError, setUrlError] = useState("");
   const [titleError, setTitleError] = useState("");
 
   const detectedPlatform = detectPlatform(url);
   const platformColor = detectedPlatform ? PLATFORM_COLORS[detectedPlatform] : null;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 16;
+
+  /* Reset auto-fill guard when the URL is cleared or changes platform */
+  const prevPlatformRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (detectedPlatform !== prevPlatformRef.current) {
+      prevPlatformRef.current = detectedPlatform;
+      userTypedTitle.current = false;
+      lastAutoFilledTitle.current = "";
+    }
+  }, [detectedPlatform]);
 
   useEffect(() => {
     if (!detectedPlatform) {
@@ -120,8 +131,21 @@ export default function AddScreen() {
       if (!cancelled) {
         setFetchedMeta(meta);
         setMetaLoading(false);
-        if (meta.title && !userTypedTitle.current) {
-          setTitle(meta.title);
+        /* Auto-fill title if:
+           - metadata has a title, AND
+           - user hasn't manually typed a different title (or title is still empty) */
+        if (meta.title) {
+          setTitle((current) => {
+            const shouldFill =
+              !userTypedTitle.current ||
+              current === "" ||
+              current === lastAutoFilledTitle.current;
+            if (shouldFill) {
+              lastAutoFilledTitle.current = meta.title!;
+              return meta.title!;
+            }
+            return current;
+          });
         }
       }
     }, 600);
@@ -323,11 +347,33 @@ export default function AddScreen() {
 
         {/* ── 3. Title ── */}
         <View style={styles.section}>
-          <Text style={styles.label}>TITLE</Text>
+          <View style={styles.titleLabelRow}>
+            <Text style={styles.label}>TITLE</Text>
+            {metaLoading && (
+              <View style={styles.titleFetchingBadge}>
+                <ActivityIndicator size="small" color="#A5F3FC" style={{ transform: [{ scale: 0.65 }] }} />
+                <Text style={styles.titleFetchingText}>fetching title…</Text>
+              </View>
+            )}
+            {!metaLoading && fetchedMeta?.title && (
+              <View style={styles.titleAutoFilledBadge}>
+                <Feather name="zap" size={10} color="#34D399" />
+                <Text style={styles.titleAutoFilledText}>auto-filled</Text>
+              </View>
+            )}
+          </View>
           <TextInput
             value={title}
-            onChangeText={(t) => { setTitle(t); userTypedTitle.current = true; if (titleError) setTitleError(""); }}
-            placeholder="Give it a memorable title"
+            onChangeText={(t) => {
+              setTitle(t);
+              userTypedTitle.current = true;
+              if (titleError) setTitleError("");
+            }}
+            placeholder={
+              metaLoading && detectedPlatform
+                ? "Fetching title from link…"
+                : "Give it a memorable title"
+            }
             placeholderTextColor="rgba(255,255,255,0.28)"
             style={[styles.input, titleError ? styles.inputError : null]}
           />
@@ -466,6 +512,38 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10, fontFamily: "Inter_600SemiBold",
     letterSpacing: 1, color: "rgba(255,255,255,0.35)",
+  },
+
+  titleLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  titleFetchingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  titleFetchingText: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(165,243,252,0.60)",
+  },
+  titleAutoFilledBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(52,211,153,0.10)",
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.20)",
+  },
+  titleAutoFilledText: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    color: "#34D399",
   },
 
   inputRow: {
