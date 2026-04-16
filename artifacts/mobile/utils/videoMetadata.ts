@@ -103,6 +103,68 @@ async function fetchPinterestOembed(
   }
 }
 
+/* ─── Pinterest: HTML scrape via CORS proxy ─────────────── */
+/*
+ * AllOrigins fetches the Pinterest page server-side and returns the
+ * raw HTML. We parse og:image / og:title with regex. This is the most
+ * reliable way to get the actual pin image since Pinterest's CDN URLs
+ * are embedded in the og:image tag.
+ *
+ * If AllOrigins fails, returns {} — the rest of the fallback chain is
+ * completely unaffected.
+ */
+
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+async function fetchPinterestViaProxy(
+  url: string
+): Promise<{ title?: string; thumbnailUrl?: string }> {
+  try {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res = await timedFetch(proxyUrl, 5000);
+    if (!res || !res.ok) return {};
+
+    const data = await res.json();
+    const html: string = data?.contents || "";
+    if (!html || html.length < 200) return {};
+
+    /* Extract og:image — handle both attribute orderings */
+    const ogImageMatch =
+      html.match(/property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+
+    const rawImageUrl = ogImageMatch?.[1];
+    const thumbnailUrl =
+      rawImageUrl && rawImageUrl.includes("pinimg.com")
+        ? decodeHtmlEntities(rawImageUrl)
+        : undefined;
+
+    /* Extract og:title as a bonus */
+    const ogTitleMatch =
+      html.match(/property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
+    const titleTagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const rawTitle = ogTitleMatch?.[1] || titleTagMatch?.[1];
+    const title = rawTitle ? decodeHtmlEntities(rawTitle).trim() : undefined;
+
+    if (thumbnailUrl || title) {
+      console.log("[Vexo] proxy scraped — title:", title, "thumb:", !!thumbnailUrl);
+    }
+
+    return { title, thumbnailUrl };
+  } catch (err) {
+    console.log("[Vexo] proxy scrape failed:", err);
+    return {};
+  }
+}
+
 /* ─── Pinterest: resolve pin.it short links ─────────────── */
 /*
  * On native (iOS/Android), fetch() follows redirects and res.url
@@ -138,39 +200,43 @@ async function resolvePinIt(url: string): Promise<string> {
 
 async function fetchPinterestMeta(url: string): Promise<VideoMetadata> {
   try {
-    /* Fire all CORS-safe sources in parallel */
-    const [oembedRes, mlRes, noembedRes, resolvedUrl] = await Promise.all([
+    /* Fire all sources in parallel — proxy scrape runs alongside the rest */
+    const [oembedRes, mlRes, noembedRes, proxyRes, resolvedUrl] = await Promise.all([
       fetchPinterestOembed(url).catch(() => ({})),
       fetchMicrolink(url).catch(() => ({})),
       fetchNoembed(url).catch(() => ({})),
+      fetchPinterestViaProxy(url).catch(() => ({})),   /* HTML scrape via AllOrigins */
       resolvePinIt(url).catch(() => url),
     ]);
 
     let title =
       (oembedRes as any).title ||
+      (proxyRes as any).title ||
       (mlRes as any).title ||
       (noembedRes as any).title ||
       (mlRes as any).description?.slice(0, 100) ||
       undefined;
 
     let thumbnailUrl =
+      (proxyRes as any).thumbnailUrl ||          /* proxy is most likely to get real CDN img */
       (oembedRes as any).thumbnailUrl ||
       (noembedRes as any).thumbnailUrl ||
       (mlRes as any).imageUrl ||
       undefined;
 
-    /* Round 2: resolved URL gave us a canonical link — retry if still missing data */
+    /* Round 2: if pin.it resolved to canonical URL and we still lack data, retry */
     const resolved = resolvedUrl as string;
     if (resolved !== url && (!title || !thumbnailUrl)) {
-      const [oe2, ml2] = await Promise.all([
+      const [oe2, ml2, proxy2] = await Promise.all([
         fetchPinterestOembed(resolved).catch(() => ({})),
         fetchMicrolink(resolved).catch(() => ({})),
+        fetchPinterestViaProxy(resolved).catch(() => ({})),
       ]);
       if (!title) {
-        title = (oe2 as any).title || (ml2 as any).title || (ml2 as any).description?.slice(0, 100);
+        title = (oe2 as any).title || (proxy2 as any).title || (ml2 as any).title || (ml2 as any).description?.slice(0, 100);
       }
       if (!thumbnailUrl) {
-        thumbnailUrl = (oe2 as any).thumbnailUrl || (ml2 as any).imageUrl;
+        thumbnailUrl = (proxy2 as any).thumbnailUrl || (oe2 as any).thumbnailUrl || (ml2 as any).imageUrl;
       }
     }
 
