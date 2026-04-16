@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { SavedItem } from "@/contexts/SavedItemsContext";
@@ -54,6 +54,7 @@ interface VideoCardProps {
 export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const thumbHeight = isLarge ? 200 : 136;
+  const [thumbError, setThumbError] = useState(false);
 
   const platformColor = PLATFORM_COLORS[item.platform] ?? "#8B5CF6";
   const platformIcon = PLATFORM_ICONS[item.platform] ?? "link";
@@ -80,13 +81,14 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
       >
         {/* ── Thumbnail area ── */}
         <View style={[styles.thumb, { height: thumbHeight }]}>
-          {item.thumbnailUrl ? (
+          {item.thumbnailUrl && !thumbError ? (
             /* ── Real thumbnail ── */
             <>
               <Image
                 source={{ uri: item.thumbnailUrl }}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
+                onError={() => setThumbError(true)}
               />
               {/* Bottom scrim so pills are readable */}
               <LinearGradient

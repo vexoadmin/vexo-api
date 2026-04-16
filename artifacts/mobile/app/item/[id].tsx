@@ -107,6 +107,7 @@ export default function ItemDetailScreen() {
   const item = items.find((i) => i.id === id);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(item?.notes || "");
+  const [thumbError, setThumbError] = useState(false);
   const [editingReminder, setEditingReminder] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -173,12 +174,13 @@ export default function ItemDetailScreen() {
         <View style={styles.heroCard}>
           {/* Thumbnail */}
           <View style={styles.thumb}>
-            {item.thumbnailUrl ? (
+            {item.thumbnailUrl && !thumbError ? (
               <>
                 <Image
                   source={{ uri: item.thumbnailUrl }}
                   style={StyleSheet.absoluteFill}
                   resizeMode="cover"
+                  onError={() => setThumbError(true)}
                 />
                 {/* Scrim for overlay readability */}
                 <LinearGradient

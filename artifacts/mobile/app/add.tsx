@@ -121,6 +121,7 @@ export default function AddScreen() {
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [fetchedMeta, setFetchedMeta] = useState<VideoMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(false);
+  const [previewImgError, setPreviewImgError] = useState(false);
   const userTypedTitle = useRef(false);
   const lastAutoFilledTitle = useRef<string>("");
   const [urlError, setUrlError] = useState("");
@@ -144,10 +145,12 @@ export default function AddScreen() {
     if (!detectedPlatform) {
       setFetchedMeta(null);
       setMetaLoading(false);
+      setPreviewImgError(false);
       return;
     }
     setMetaLoading(true);
     setFetchedMeta(null);
+    setPreviewImgError(false);
     let cancelled = false;
     const timer = setTimeout(async () => {
       const meta = await fetchVideoMetadata(normalizeUrl(url), detectedPlatform);
@@ -275,12 +278,13 @@ export default function AddScreen() {
           {detectedPlatform ? (
             <>
               {/* Background: real thumbnail OR gradient placeholder */}
-              {fetchedMeta?.thumbnailUrl ? (
+              {fetchedMeta?.thumbnailUrl && !previewImgError ? (
                 <>
                   <Image
                     source={{ uri: fetchedMeta.thumbnailUrl }}
                     style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
                     resizeMode="cover"
+                    onError={() => setPreviewImgError(true)}
                   />
                   <LinearGradient
                     colors={["rgba(6,8,20,0.18)", "rgba(6,8,20,0.72)"]}
@@ -334,7 +338,7 @@ export default function AddScreen() {
                     <>
                       <Feather name="check-circle" size={12} color="#34D399" />
                       <Text style={styles.previewConfirmedText}>
-                        {fetchedMeta?.thumbnailUrl ? "Preview ready" : "Link confirmed"}
+                        {fetchedMeta?.thumbnailUrl && !previewImgError ? "Preview ready" : "Link confirmed"}
                       </Text>
                     </>
                   )}
@@ -342,7 +346,7 @@ export default function AddScreen() {
               </View>
 
               {/* Center play button — only when we have a real thumbnail */}
-              {fetchedMeta?.thumbnailUrl ? (
+              {fetchedMeta?.thumbnailUrl && !previewImgError ? (
                 <View style={styles.previewPlayArea}>
                   <View style={[styles.previewPlayBtn, { borderColor: "rgba(255,255,255,0.35)" }]}>
                     <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />

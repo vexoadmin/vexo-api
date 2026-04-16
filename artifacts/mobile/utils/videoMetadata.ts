@@ -37,8 +37,7 @@ async function timedFetch(url: string, ms = 8000): Promise<Response | null> {
   }
 }
 
-/* ─── Source 1: noembed.com — CORS-safe oEmbed aggregator ── */
-/* Works for: YouTube, TikTok, Vimeo, and many others       */
+/* ─── Source: noembed.com — CORS-safe oEmbed aggregator ─── */
 
 async function fetchNoembed(url: string): Promise<{ title?: string; thumbnailUrl?: string }> {
   const res = await timedFetch(
@@ -57,11 +56,10 @@ async function fetchNoembed(url: string): Promise<{ title?: string; thumbnailUrl
   }
 }
 
-/* ─── Source 2: Microlink — OG-tag extractor, all platforms ─ */
-/* Server-side: follows redirects automatically (pin.it etc) */
+/* ─── Source: Microlink — OG-tag extractor, server-side ─── */
+/* Follows redirects automatically (pin.it, fb.watch, etc.) */
 
 async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?: string; description?: string }> {
-  /* Use &meta=true for Pinterest to also get description-based title fallback */
   const res = await timedFetch(
     `https://api.microlink.io/?url=${encodeURIComponent(url)}&palette=false&audio=false&video=false&iframe=false`
   );
@@ -79,48 +77,102 @@ async function fetchMicrolink(url: string): Promise<{ title?: string; imageUrl?:
   }
 }
 
-/* ─── Source 3: Pinterest-specific — resolve pin.it then Microlink ─ */
+/* ─── Source: Pinterest oEmbed ──────────────────────────── */
 /*
- * pin.it short links redirect (301/302) to the full pinterest.com URL.
- * fetch() in React Native DOES follow redirects natively, so we can
- * resolve the final URL ourselves and pass it to Microlink for OG extraction.
- * Microlink also follows redirects server-side, so passing pin.it directly
- * also works — but passing the resolved URL gives faster, more reliable results.
+ * Pinterest runs its own oEmbed endpoint that is CORS-enabled and
+ * works for both full pinterest.com/pin/ URLs and some short links.
+ * Returns title (pin description text) + thumbnail_url.
+ */
+
+async function fetchPinterestOembed(
+  url: string
+): Promise<{ title?: string; thumbnailUrl?: string }> {
+  const res = await timedFetch(
+    `https://www.pinterest.com/oembed.json?url=${encodeURIComponent(url)}`
+  );
+  if (!res || !res.ok) return {};
+  try {
+    const data = await res.json();
+    if (!data || data.error) return {};
+    return {
+      title: data.title || data.author_name || undefined,
+      thumbnailUrl: data.thumbnail_url || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/* ─── Pinterest: resolve pin.it short links ─────────────── */
+/*
+ * On native (iOS/Android), fetch() follows redirects and res.url
+ * gives the final destination. On web (CORS) this silently falls
+ * back to the original URL — all other sources still run in parallel.
  */
 
 async function resolvePinIt(url: string): Promise<string> {
-  const lower = url.toLowerCase();
-  if (!lower.includes("pin.it")) return url;
+  if (!url.toLowerCase().includes("pin.it")) return url;
   try {
-    /* React Native fetch follows redirects — read the final response URL */
     const ctrl = new AbortController();
-    const id = setTimeout(() => ctrl.abort(), 6000);
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      method: "GET",
-      redirect: "follow",
-    });
+    const id = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
     clearTimeout(id);
-    /* res.url is the final URL after all redirects */
     if (res.url && res.url !== url) return res.url;
   } catch {
-    /* fall through — just use original URL */
+    /* CORS or network — fall through */
   }
   return url;
 }
 
-async function fetchPinterestMeta(url: string): Promise<{ title?: string; thumbnailUrl?: string }> {
-  /* Step 1: resolve short link to the canonical Pinterest URL */
-  const resolvedUrl = await resolvePinIt(url);
+/* ─── Pinterest main fetch ───────────────────────────────── */
+/*
+ * Strategy (all fired as fast as possible):
+ *   Round 1 — three sources in parallel with the original URL
+ *   Round 2 — if pin.it resolved to a different URL AND round 1
+ *             yielded no image, run oEmbed + Microlink again with
+ *             the resolved canonical URL
+ *   Fallback — title: "Saved from Pinterest", thumbnail: undefined
+ *             (VideoCard has a styled placeholder for missing thumbnails)
+ */
 
-  /* Step 2: pass the resolved (or original) URL to Microlink */
-  const ml = await fetchMicrolink(resolvedUrl);
+async function fetchPinterestMeta(url: string): Promise<VideoMetadata> {
+  /* Fire all three CORS-safe sources in parallel right away */
+  const [oembedRes, mlRes, noembedRes, resolvedUrl] = await Promise.all([
+    fetchPinterestOembed(url),
+    fetchMicrolink(url),
+    fetchNoembed(url),
+    resolvePinIt(url),             /* also runs in parallel */
+  ]);
 
-  /* Step 3: build best result — title from og:title or description; image from og:image */
-  const title = ml.title || ml.description?.slice(0, 80) || undefined;
-  const thumbnailUrl = ml.imageUrl || undefined;
+  /* Merge round-1 results */
+  let title =
+    oembedRes.title ||
+    mlRes.title ||
+    noembedRes.title ||
+    mlRes.description?.slice(0, 100) ||
+    undefined;
 
-  return { title, thumbnailUrl };
+  let thumbnailUrl =
+    oembedRes.thumbnailUrl ||
+    noembedRes.thumbnailUrl ||
+    mlRes.imageUrl ||
+    undefined;
+
+  /* Round 2: if pin.it resolved and we still lack data, retry with canonical URL */
+  if (resolvedUrl !== url && (!title || !thumbnailUrl)) {
+    const [oe2, ml2] = await Promise.all([
+      fetchPinterestOembed(resolvedUrl),
+      fetchMicrolink(resolvedUrl),
+    ]);
+    if (!title) title = oe2.title || ml2.title || ml2.description?.slice(0, 100);
+    if (!thumbnailUrl) thumbnailUrl = oe2.thumbnailUrl || ml2.imageUrl;
+  }
+
+  /* Guaranteed fallbacks — always return something useful */
+  return {
+    title: title || "Saved from Pinterest",
+    thumbnailUrl,
+  };
 }
 
 /* ─── Main export ─────────────────────────────────────────── */
@@ -129,16 +181,16 @@ export async function fetchVideoMetadata(
   url: string,
   platform: string
 ): Promise<VideoMetadata> {
-  /* YouTube: always build the direct thumbnail immediately (no network needed) */
-  const videoId = platform === "youtube" ? extractYoutubeId(url) : null;
-  const ytThumbnail = videoId ? getYoutubeThumbnail(videoId) : undefined;
-
-  /* Pinterest: custom resolver to handle pin.it short links */
+  /* Pinterest: custom multi-source resolver */
   if (platform === "pinterest") {
     return fetchPinterestMeta(url);
   }
 
-  /* Generic websites: only microlink works (noembed only handles video embeds) */
+  /* YouTube: always build the direct thumbnail immediately (no network needed) */
+  const videoId = platform === "youtube" ? extractYoutubeId(url) : null;
+  const ytThumbnail = videoId ? getYoutubeThumbnail(videoId) : undefined;
+
+  /* Generic websites: only Microlink works (noembed handles only video embeds) */
   if (platform === "website") {
     const ml = await fetchMicrolink(url);
     return { title: ml.title, thumbnailUrl: ml.imageUrl };
