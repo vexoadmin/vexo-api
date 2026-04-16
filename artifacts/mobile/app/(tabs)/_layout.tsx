@@ -20,6 +20,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "folder", selected: "folder.fill" }} />
         <Label>Categories</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="more">
+        <Icon sf={{ default: "ellipsis.circle", selected: "ellipsis.circle.fill" }} />
+        <Label>More</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -83,6 +87,18 @@ function ClassicTabLayout() {
               <SymbolView name="folder" tintColor={color} size={24} />
             ) : (
               <Feather name="grid" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: "More",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="ellipsis.circle" tintColor={color} size={24} />
+            ) : (
+              <Feather name="more-horizontal" size={22} color={color} />
             ),
         }}
       />
