@@ -13,8 +13,31 @@ const PLATFORM_LABELS: Record<string, string> = {
   facebook: "Facebook",
 };
 
+const PLATFORM_ICONS: Record<string, string> = {
+  youtube: "play-circle",
+  tiktok: "video",
+  instagram: "camera",
+  facebook: "users",
+};
+
+const PLATFORM_COLORS: Record<string, string> = {
+  youtube: "#EF4444",
+  tiktok: "#22D3EE",
+  instagram: "#D946EF",
+  facebook: "#8B5CF6",
+};
+
 const BORDER = "rgba(255,255,255,0.10)";
 const CARD_BG = "rgba(255,255,255,0.04)";
+
+function extractDomain(url: string): string {
+  try {
+    const { hostname } = new URL(url);
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return url.slice(0, 24);
+  }
+}
 
 interface VideoCardProps {
   item: SavedItem;
@@ -25,6 +48,10 @@ interface VideoCardProps {
 export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const thumbHeight = isLarge ? 200 : 136;
+
+  const platformColor = PLATFORM_COLORS[item.platform] ?? "#8B5CF6";
+  const platformIcon = PLATFORM_ICONS[item.platform] ?? "link";
+  const domain = extractDomain(item.url);
 
   function handlePressIn() {
     Animated.spring(scale, { toValue: 0.965, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
@@ -45,17 +72,17 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
         onPressOut={handlePressOut}
         style={styles.card}
       >
-        {/* Thumbnail */}
+        {/* ── Thumbnail area ── */}
         <View style={[styles.thumb, { height: thumbHeight }]}>
           {item.thumbnailUrl ? (
+            /* ── Real thumbnail ── */
             <>
-              {/* Real thumbnail */}
               <Image
                 source={{ uri: item.thumbnailUrl }}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
               />
-              {/* Bottom scrim so category pill is readable */}
+              {/* Bottom scrim so pills are readable */}
               <LinearGradient
                 colors={["transparent", "rgba(0,0,0,0.60)"]}
                 start={{ x: 0, y: 0.4 }}
@@ -64,21 +91,37 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
               />
             </>
           ) : (
+            /* ── Styled fallback — NEVER blank ── */
             <>
-              {/* Gradient placeholder */}
+              {/* Base gradient */}
               <LinearGradient
-                colors={["#D946EF40", "#8B5CF626", "#22D3EE33"]}
+                colors={["#D946EF22", "#8B5CF618", "#22D3EE22"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              {/* Radial highlight top-left */}
+              {/* Top-left glow */}
               <LinearGradient
-                colors={["rgba(255,255,255,0.20)", "transparent"]}
+                colors={[platformColor + "28", "transparent"]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 0.65, y: 0.65 }}
+                end={{ x: 0.7, y: 0.7 }}
                 style={StyleSheet.absoluteFill}
               />
+              {/* Centered icon + domain */}
+              <View style={styles.fallbackCenter}>
+                <View style={[styles.fallbackIconWrap, { borderColor: platformColor + "55", backgroundColor: platformColor + "18" }]}>
+                  <Feather name={platformIcon as any} size={22} color={platformColor} />
+                </View>
+                <Text style={[styles.fallbackDomain, { color: platformColor + "CC" }]} numberOfLines={1}>
+                  {domain}
+                </Text>
+              </View>
+              {/* Bottom-right platform badge */}
+              <View style={styles.fallbackBadge}>
+                <Text style={[styles.fallbackBadgeText, { color: platformColor }]}>
+                  {PLATFORM_LABELS[item.platform]}
+                </Text>
+              </View>
             </>
           )}
 
@@ -93,11 +136,13 @@ export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
           </View>
         </View>
 
-        {/* Text area below thumbnail */}
+        {/* ── Text area below thumbnail ── */}
         <View style={styles.textArea}>
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-            <Text style={styles.source}>{PLATFORM_LABELS[item.platform]}</Text>
+            <Text style={[styles.source, { color: platformColor + "CC" }]}>
+              {PLATFORM_LABELS[item.platform]}
+            </Text>
           </View>
           {item.notes ? (
             <Text style={styles.note} numberOfLines={1}>{item.notes}</Text>
@@ -125,6 +170,46 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
+
+  /* Fallback layout */
+  fallbackCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  fallbackIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fallbackDomain: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.2,
+    maxWidth: "75%",
+    textAlign: "center",
+  },
+  fallbackBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  fallbackBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.4,
+  },
+
   reminderDot: {
     position: "absolute",
     top: 8,
@@ -171,7 +256,6 @@ const styles = StyleSheet.create({
   source: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: "rgba(165,243,252,0.85)",
     marginTop: 1,
     flexShrink: 0,
   },

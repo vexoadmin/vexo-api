@@ -47,11 +47,27 @@ const PLATFORM_LABELS: Record<string, string> = {
   facebook: "Facebook",
 };
 const PLATFORM_ICONS: Record<string, string> = {
-  youtube: "youtube",
-  tiktok: "music",
-  instagram: "instagram",
-  facebook: "facebook",
+  youtube: "play-circle",
+  tiktok: "video",
+  instagram: "camera",
+  facebook: "users",
 };
+
+const PLATFORM_COLORS: Record<string, string> = {
+  youtube: "#EF4444",
+  tiktok: "#22D3EE",
+  instagram: "#D946EF",
+  facebook: "#8B5CF6",
+};
+
+function extractDomain(url: string): string {
+  try {
+    const { hostname } = new URL(url);
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return url.slice(0, 24);
+  }
+}
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-US", {
@@ -167,19 +183,39 @@ export default function ItemDetailScreen() {
                 />
               </>
             ) : (
+              /* ── Styled fallback — never blank ── */
               <>
                 <LinearGradient
-                  colors={["#22D3EE33", "#8B5CF626", "#D946EF33"]}
+                  colors={["#22D3EE22", "#8B5CF618", "#D946EF22"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
                 <LinearGradient
-                  colors={["rgba(255,255,255,0.18)", "transparent"]}
+                  colors={[(PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "30", "transparent"]}
                   start={{ x: 0, y: 0 }}
-                  end={{ x: 0.65, y: 0.65 }}
+                  end={{ x: 0.7, y: 0.7 }}
                   style={StyleSheet.absoluteFill}
                 />
+                {/* Centered icon + domain */}
+                <View style={styles.heroFallbackCenter}>
+                  <View style={[
+                    styles.heroFallbackIconWrap,
+                    {
+                      borderColor: (PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "55",
+                      backgroundColor: (PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "20",
+                    },
+                  ]}>
+                    <Feather
+                      name={(PLATFORM_ICONS[item.platform] ?? "link") as any}
+                      size={30}
+                      color={PLATFORM_COLORS[item.platform] ?? "#8B5CF6"}
+                    />
+                  </View>
+                  <Text style={[styles.heroFallbackDomain, { color: (PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "CC" }]}>
+                    {extractDomain(item.url)}
+                  </Text>
+                </View>
               </>
             )}
             {/* Category pill — top left */}
@@ -378,6 +414,25 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
+  },
+  heroFallbackCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  heroFallbackIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroFallbackDomain: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.3,
   },
   heroCatPill: {
     position: "absolute",
