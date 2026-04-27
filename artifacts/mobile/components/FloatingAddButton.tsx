@@ -1,33 +1,54 @@
-import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
-interface FloatingAddButtonProps {
+type FloatingAddButtonProps = {
   onPress: () => void;
   bottomOffset?: number;
-}
+};
 
-export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddButtonProps) {
+export function FloatingAddButton({
+  onPress,
+  bottomOffset = 86,
+}: FloatingAddButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
-  const pulse = useRef(new Animated.Value(1)).current;
+  const glow = useRef(new Animated.Value(0.58)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.35, duration: 1800, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(glow, {
+          toValue: 0.92,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glow, {
+          toValue: 0.58,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
       ])
-    ).start();
-  }, []);
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [glow]);
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(scale, {
+      toValue: 0.94,
+      useNativeDriver: true,
+    }).start();
   }
+
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 14 }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
   }
+
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onPress();
@@ -35,16 +56,38 @@ export function FloatingAddButton({ onPress, bottomOffset = 100 }: FloatingAddBu
 
   return (
     <View style={[styles.anchor, { bottom: bottomOffset }]}>
-      <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulse }] }]} />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.glow,
+          {
+            opacity: glow,
+            transform: [
+              {
+                scale: glow.interpolate({
+                  inputRange: [0.58, 0.92],
+                  outputRange: [0.96, 1.08],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Pressable onPress={handlePress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        <Pressable
+          onPress={handlePress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          hitSlop={10}
+        >
           <LinearGradient
             colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.btn}
           >
-            <Feather name="plus" size={26} color="#fff" />
+            <Text style={styles.plus}>+</Text>
           </LinearGradient>
         </Pressable>
       </Animated.View>
@@ -58,25 +101,35 @@ const styles = StyleSheet.create({
     right: 20,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 20,
   },
-  pulseRing: {
+
+  glow: {
     position: "absolute",
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: "#22D3EE",
-    opacity: 0.18,
+    width: 78,
+    height: 78,
+    borderRadius: 999,
+    backgroundColor: "#8B5CF6",
   },
+
   btn: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 62,
+    height: 62,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#22D3EE",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 24,
-    elevation: 16,
+    shadowOpacity: 0.65,
+    shadowRadius: 22,
+    elevation: 14,
+  },
+
+  plus: {
+    color: "#FFFFFF",
+    fontSize: 34,
+    lineHeight: 34,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: -3,
   },
 });

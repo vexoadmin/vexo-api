@@ -1,11 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  Animated,
+  Alert,
   FlatList,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -18,381 +18,375 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CategoryChip } from "@/components/CategoryChip";
 import { FloatingAddButton } from "@/components/FloatingAddButton";
-
 import { VideoCard } from "@/components/VideoCard";
 import { useSavedItems } from "@/contexts/SavedItemsContext";
 
-const BG = "#060814";
-const BORDER = "rgba(255,255,255,0.10)";
-const CARD_BG = "rgba(255,255,255,0.04)";
+const BG = "#040812";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { items, categories, searchItems } = useSavedItems();
+  const { items, categories, searchItems, deleteItem } = useSavedItems();
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const searchAnim = useRef(new Animated.Value(0)).current;
-  const searchRef = useRef<TextInput>(null);
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPadding = Platform.OS === "web" ? 84 + 34 : insets.bottom + 90;
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  function openSearch() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSearchOpen(true);
-    Animated.spring(searchAnim, { toValue: 1, useNativeDriver: false, speed: 22, bounciness: 4 }).start();
-    setTimeout(() => searchRef.current?.focus(), 80);
-  }
+  const androidBottomSpace = Math.max(insets.bottom, 20);
 
-  function closeSearch() {
-    setSearchQuery("");
-    Animated.spring(searchAnim, { toValue: 0, useNativeDriver: false, speed: 22, bounciness: 0 }).start(() => {
-      setSearchOpen(false);
-    });
-  }
+  const tabBarHeight =
+    Platform.OS === "android" ? 78 + androidBottomSpace : 76 + insets.bottom;
 
-  const searchBarHeight = searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 52] });
-  const searchBarOpacity = searchAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
+  const listBottomPad = tabBarHeight + 24;
+  const plusBottom = tabBarHeight - 28;
 
   const displayedItems = useMemo(() => {
     let list = searchQuery.trim() ? searchItems(searchQuery) : items;
+
     if (selectedCategory !== "All") {
       list = list.filter((i) => i.category === selectedCategory);
     }
+
     return list;
   }, [items, searchQuery, selectedCategory, searchItems]);
 
-  const leftColumn = useMemo(
-    () => displayedItems.filter((_, i) => i % 2 === 0),
-    [displayedItems]
-  );
-  const rightColumn = useMemo(
-    () => displayedItems.filter((_, i) => i % 2 === 1),
-    [displayedItems]
-  );
+  const leftColumn = displayedItems.filter((_, i) => i % 2 === 0);
+  const rightColumn = displayedItems.filter((_, i) => i % 2 === 1);
 
-  const categoryList = useMemo(
-    () => ["All", ...categories.map((c) => c.name)],
-    [categories]
-  );
+  const categoryList = ["All", ...categories.map((c) => c.name)];
 
-  const isEmpty = displayedItems.length === 0;
-  const isGlobalEmpty = items.length === 0;
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((itemId) => itemId !== id)
+        : [...prev, id];
 
-  const sectionLabel = searchQuery.trim()
-    ? `Results for "${searchQuery}"`
-    : selectedCategory !== "All"
-    ? selectedCategory
-    : "Recent Saved";
+      if (next.length === 0) {
+        setSelectionMode(false);
+      }
+
+      return next;
+    });
+  }
+
+  function startSelection(id: string) {
+    setSelectionMode(true);
+    setSelectedIds([id]);
+  }
+
+  function clearSelection() {
+    setSelectionMode(false);
+    setSelectedIds([]);
+  }
+
+  function confirmDeleteSelected() {
+    if (selectedIds.length === 0) return;
+
+    Alert.alert(
+      "Delete selected",
+      `Delete ${selectedIds.length} saved item${selectedIds.length === 1 ? "" : "s"}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            selectedIds.forEach((id) => deleteItem(id));
+            clearSelection();
+          },
+        },
+      ]
+    );
+  }
+
+  function handleCardPress(id: string) {
+    if (selectionMode) {
+      toggleSelect(id);
+      return;
+    }
+
+    router.push(`/item/${id}`);
+  }
 
   return (
     <View style={styles.container}>
-      {/* Ambient glow blobs */}
-      <View style={styles.glowTopLeft} pointerEvents="none" />
-      <View style={styles.glowTopRight} pointerEvents="none" />
+      <LinearGradient
+        colors={["#031020", "#051120", "#040812"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.bgAccentTopLeft} pointerEvents="none" />
+      <View style={styles.bgAccentTopRight} pointerEvents="none" />
+
+      {selectionMode ? (
+        <View style={[styles.selectionBar, { paddingTop: insets.top + 10 }]}>
+          <Pressable onPress={clearSelection} hitSlop={10}>
+            <Feather name="x" size={24} color="#FFFFFF" />
+          </Pressable>
+
+          <Text style={styles.selectionTitle}>
+            {selectedIds.length} selected
+          </Text>
+
+          <Pressable onPress={confirmDeleteSelected} hitSlop={10}>
+            <Text style={styles.selectionDelete}>Delete</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <FlatList
-        data={[1]}
-        keyExtractor={() => "content"}
+        data={displayedItems.length === 0 ? [] : [1]}
+        keyExtractor={() => "grid"}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomPadding }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: listBottomPad }}
         ListHeaderComponent={
           <View>
-            {/* ── Header ── */}
-            <View style={[styles.header, { paddingTop: topPadding + 14 }]}>
-              {/* Title + search icon */}
-              <View style={styles.headerTop}>
-                <Text style={styles.mainTitle}>
-                  <Text style={styles.titleWhite}>Vexo</Text>
-                  <Text style={styles.titleAccent}> Save</Text>
-                </Text>
-                <Pressable
-                  onPress={searchOpen ? closeSearch : openSearch}
-                  style={[styles.searchIconBtn, searchOpen && styles.searchIconBtnActive]}
-                  hitSlop={8}
-                >
-                  <Feather
-                    name={searchOpen ? "x" : "search"}
-                    size={17}
-                    color={searchOpen ? "#A5F3FC" : "rgba(255,255,255,0.65)"}
+            {!selectionMode ? (
+              <>
+                <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                  <Image
+                    source={require("../../assets/images/vexo-logo-muted-cropped.png")}
+                    style={styles.logoImage}
+                    resizeMode="contain"
                   />
-                </Pressable>
-              </View>
 
-              {/* Tagline */}
-              <Text style={styles.tagline}>Save. Organize. Find.</Text>
+                  <Text style={styles.heroSubtitle}>Save. Organize. Find.</Text>
 
-              {/* Collapsible search bar */}
-              <Animated.View style={[styles.searchWrap, { height: searchBarHeight, opacity: searchBarOpacity }]}>
-                <View style={styles.searchInner}>
-                  <Feather name="search" size={14} color="rgba(255,255,255,0.35)" />
-                  <TextInput
-                    ref={searchRef}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search saved videos..."
-                    placeholderTextColor="rgba(255,255,255,0.30)"
-                    style={styles.searchInput}
-                    returnKeyType="search"
-                  />
-                  {searchQuery.length > 0 && (
-                    <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
-                      <Feather name="x-circle" size={14} color="rgba(255,255,255,0.35)" />
-                    </Pressable>
-                  )}
+                  <View style={styles.searchWrap}>
+                    <View style={styles.searchInner}>
+                      <Text style={styles.searchInlineIcon}>⌕</Text>
+
+                      <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search saved videos..."
+                        placeholderTextColor="rgba(255,255,255,0.28)"
+                        style={styles.searchInput}
+                        returnKeyType="search"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+
+                      {searchQuery.length > 0 ? (
+                        <Pressable onPress={() => setSearchQuery("")}>
+                          <Text style={styles.searchClear}>×</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
-              </Animated.View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.categoryScroll}
+                  contentContainerStyle={styles.categoryRow}
+                >
+                  {categoryList.map((name, idx) => (
+                    <View
+                      key={name}
+                      style={{
+                        marginLeft: idx === 0 ? 20 : 8,
+                      }}
+                    >
+                      <CategoryChip
+                        label={name}
+                        selected={selectedCategory === name}
+                        onPress={() => setSelectedCategory(name)}
+                      />
+                    </View>
+                  ))}
+                  <View style={{ width: 20 }} />
+                </ScrollView>
+              </>
+            ) : null}
+
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionLabel}>
+                {selectionMode ? "SELECT ITEMS" : "RECENT SAVED"}
+              </Text>
+              <Text style={styles.sectionCount}>{displayedItems.length}</Text>
             </View>
-
-            {/* ── Category chips ── */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.chipsScroll}
-              contentContainerStyle={styles.chipsContent}
-            >
-              {categoryList.map((name, idx) => (
-                <View
-                  key={name}
-                  style={{ marginLeft: idx === 0 ? 20 : 8, marginRight: 0 }}
-                >
-                  <CategoryChip
-                    label={name}
-                    selected={selectedCategory === name}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setSelectedCategory(name);
-                    }}
-                  />
-                </View>
-              ))}
-              {/* + Add dashed chip */}
-              <View style={{ marginLeft: 8, marginRight: 20 }}>
-                <Pressable
-                  onPress={() => router.push("/add")}
-                  style={styles.addChip}
-                >
-                  <Text style={styles.addChipText}>+ Add</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-
-            {/* ── Section label ── */}
-            {!isGlobalEmpty && (
-              <View style={styles.sectionRow}>
-                <Text style={styles.sectionLabel}>{sectionLabel.toUpperCase()}</Text>
-                {!isEmpty && (
-                  <Text style={styles.sectionCount}>{displayedItems.length}</Text>
-                )}
-              </View>
-            )}
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>◌</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery || selectedCategory !== "All"
+                ? "No videos found"
+                : "No saved videos yet"}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery || selectedCategory !== "All"
+                ? "Try a different search or category"
+                : 'Tap "+" to save your first video'}
+            </Text>
           </View>
         }
         renderItem={() => (
-          <View style={styles.gridWrap}>
-            {isEmpty ? (
-              isGlobalEmpty ? (
-                <GlobalEmptyState onAdd={() => router.push("/add")} />
-              ) : (
-                <FilteredEmptyState
-                  selectedCategory={selectedCategory}
-                  searchQuery={searchQuery}
-                  onAdd={() => router.push("/add")}
-                  onClear={() => { setSelectedCategory("All"); setSearchQuery(""); closeSearch(); }}
+          <View style={styles.grid}>
+            <View style={styles.column}>
+              {leftColumn.map((item) => (
+                <VideoCard
+                  key={item.id}
+                  item={item}
+                  isSelected={selectedIds.includes(item.id)}
+                  selectionMode={selectionMode}
+                  onPress={() => handleCardPress(item.id)}
+                  onLongPress={() => startSelection(item.id)}
                 />
-              )
-            ) : (
-              <View style={styles.grid}>
-                <View style={styles.column}>
-                  {leftColumn.map((item, idx) => (
-                    <VideoCard
-                      key={item.id}
-                      item={item}
-                      isLarge={idx % 3 === 0}
-                      onPress={() => router.push(`/item/${item.id}`)}
-                    />
-                  ))}
-                </View>
-                <View style={styles.column}>
-                  {rightColumn.map((item, idx) => (
-                    <VideoCard
-                      key={item.id}
-                      item={item}
-                      isLarge={idx % 3 === 1}
-                      onPress={() => router.push(`/item/${item.id}`)}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
+              ))}
+            </View>
+
+            <View style={styles.column}>
+              {rightColumn.map((item) => (
+                <VideoCard
+                  key={item.id}
+                  item={item}
+                  isSelected={selectedIds.includes(item.id)}
+                  selectionMode={selectionMode}
+                  onPress={() => handleCardPress(item.id)}
+                  onLongPress={() => startSelection(item.id)}
+                />
+              ))}
+            </View>
           </View>
         )}
       />
-      <FloatingAddButton onPress={() => router.push("/add")} bottomOffset={bottomPadding - 40} />
+
+      {!selectionMode ? (
+        <FloatingAddButton
+          onPress={() => router.push("/add")}
+          bottomOffset={plusBottom}
+        />
+      ) : null}
     </View>
   );
 }
-
-function GlobalEmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <View style={emptyS.wrap}>
-      <View style={emptyS.iconRing}>
-        <Feather name="bookmark" size={32} color="#A5F3FC" style={{ opacity: 0.7 }} />
-      </View>
-      <Text style={emptyS.title}>Your library is empty</Text>
-      <Text style={emptyS.desc}>Save your first video from YouTube,{"\n"}TikTok, or Instagram.</Text>
-      <Pressable onPress={onAdd} style={({ pressed }) => [emptyS.cta, { opacity: pressed ? 0.8 : 1 }]}>
-        <LinearGradient
-          colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={emptyS.ctaGrad}
-        >
-          <Feather name="plus" size={15} color="#fff" />
-          <Text style={emptyS.ctaText}>Save your first video</Text>
-        </LinearGradient>
-      </Pressable>
-    </View>
-  );
-}
-
-function FilteredEmptyState({ selectedCategory, searchQuery, onAdd, onClear }: { selectedCategory: string; searchQuery: string; onAdd: () => void; onClear: () => void; }) {
-  const isSearch = !!searchQuery.trim();
-  return (
-    <View style={emptyS.wrap}>
-      <View style={emptyS.iconRing}>
-        <Feather name={isSearch ? "search" : "folder"} size={28} color="rgba(255,255,255,0.30)" />
-      </View>
-      <Text style={emptyS.title}>{isSearch ? "No results found" : `No ${selectedCategory} videos`}</Text>
-      <Text style={emptyS.desc}>{isSearch ? `Nothing matched "${searchQuery}"` : `No ${selectedCategory} videos saved yet`}</Text>
-      <View style={emptyS.row}>
-        <Pressable onPress={onClear} style={({ pressed }) => [emptyS.secondary, { opacity: pressed ? 0.8 : 1 }]}>
-          <Text style={emptyS.secondaryText}>Clear</Text>
-        </Pressable>
-        <Pressable onPress={onAdd} style={({ pressed }) => [emptyS.cta, { flex: 1, opacity: pressed ? 0.8 : 1 }]}>
-          <LinearGradient colors={["#D946EF", "#8B5CF6", "#22D3EE"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={emptyS.ctaGrad}>
-            <Feather name="plus" size={14} color="#fff" />
-            <Text style={emptyS.ctaText}>Add video</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-const emptyS = StyleSheet.create({
-  wrap: { alignItems: "center", paddingTop: 72, paddingHorizontal: 32, gap: 12 },
-  iconRing: { width: 84, height: 84, borderRadius: 42, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.10)", alignItems: "center", justifyContent: "center", marginBottom: 8 },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.4, textAlign: "center", color: "#FFFFFF" },
-  desc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20, color: "rgba(255,255,255,0.55)" },
-  row: { flexDirection: "row", gap: 8, marginTop: 6, alignSelf: "stretch" },
-  cta: { borderRadius: 16, overflow: "hidden" },
-  ctaGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 20, paddingVertical: 14, gap: 6 },
-  ctaText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  secondary: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.10)", backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" },
-  secondaryText: { fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.60)" },
-});
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
-
-  glowTopLeft: {
+  bgAccentTopLeft: {
     position: "absolute",
-    top: -40,
-    left: -20,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "rgba(217,70,239,0.12)",
+    top: -70,
+    left: -40,
+    width: 210,
+    height: 210,
+    borderRadius: 999,
+    backgroundColor: "rgba(116,93,230,0.12)",
   },
-  glowTopRight: {
+  bgAccentTopRight: {
     position: "absolute",
-    top: 120,
-    right: -30,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: "rgba(34,211,238,0.06)",
+    top: 10,
+    right: -55,
+    width: 185,
+    height: 185,
+    borderRadius: 999,
+    backgroundColor: "rgba(34,211,238,0.08)",
+  },
+  container: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+
+  selectionBar: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: "rgba(5,8,20,0.96)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 30,
+  },
+
+  selectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  selectionDelete: {
+    color: "#F87171",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
 
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    overflow: "hidden",
-  },
-  headerTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  mainTitle: {
-    fontSize: 38,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -2,
-    includeFontPadding: false,
-  },
-  titleWhite: { color: "#FFFFFF" },
-  titleAccent: { color: "#8B5CF6" },
-  tagline: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.38)",
-    letterSpacing: 0.3,
-    marginTop: 5,
-  },
-  searchIconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchIconBtnActive: {
-    backgroundColor: "rgba(34,211,238,0.08)",
-    borderColor: "rgba(34,211,238,0.30)",
+    paddingBottom: 4,
   },
 
-  searchWrap: { overflow: "hidden", marginTop: 12 },
+  logoImage: {
+    width: 170,
+    height: 70,
+    alignSelf: "flex-start",
+    marginTop: 24,
+    marginBottom: 14,
+  },
+
+  heroSubtitle: {
+    marginTop: 0,
+    marginBottom: 12,
+    marginLeft: 2,
+    fontSize: 15,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.70)",
+    fontFamily: "Inter_400Regular",
+  },
+
+  searchWrap: {
+    marginTop: 0,
+    marginBottom: 8,
+  },
+
   searchInner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 16,
+    minHeight: 56,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    gap: 10,
-    flex: 1,
+    paddingHorizontal: 16,
   },
+
+  searchInlineIcon: {
+    color: "rgba(255,255,255,0.40)",
+    fontSize: 22,
+    lineHeight: 22,
+    marginRight: 10,
+  },
+
   searchInput: {
     flex: 1,
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
     color: "#FFFFFF",
     paddingVertical: 0,
-  },
-
-  chipsScroll: { marginTop: 16, marginBottom: 2 },
-  chipsContent: { flexDirection: "row", alignItems: "center" },
-
-  addChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "rgba(165,243,252,0.30)",
-    backgroundColor: "rgba(34,211,238,0.10)",
-  },
-  addChipText: {
-    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "#A5F3FC",
+  },
+
+  searchClear: {
+    color: "rgba(255,255,255,0.40)",
+    fontSize: 24,
+    lineHeight: 24,
+    marginLeft: 10,
+  },
+
+  categoryScroll: {
+    marginTop: 2,
+  },
+
+  categoryRow: {
+    paddingTop: 10,
+    paddingBottom: 16,
+    alignItems: "center",
+    paddingRight: 12,
   },
 
   sectionRow: {
@@ -400,22 +394,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 12,
+    paddingBottom: 14,
   },
+
   sectionLabel: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    color: "rgba(255,255,255,0.25)",
-    letterSpacing: 1.2,
-  },
-  sectionCount: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.20)",
+    color: "rgba(255,255,255,0.24)",
+    letterSpacing: 1.35,
   },
 
-  gridWrap: { paddingHorizontal: 14 },
-  grid: { flexDirection: "row", gap: 10 },
-  column: { flex: 1 },
+  sectionCount: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.22)",
+  },
+
+  grid: {
+    flexDirection: "row",
+    paddingHorizontal: 10,
+  },
+
+  column: {
+    flex: 1,
+    paddingHorizontal: 3,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 84,
+    paddingHorizontal: 40,
+  },
+
+  emptyIcon: {
+    fontSize: 42,
+    color: "rgba(255,255,255,0.15)",
+    marginBottom: 12,
+  },
+
+  emptyText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.52)",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+
+  emptySubtext: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.30)",
+    textAlign: "center",
+    fontFamily: "Inter_400Regular",
+  },
 });

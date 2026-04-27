@@ -2,9 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
+import { useRouter } from "expo-router";
 import React, { useRef } from "react";
 import {
   Animated,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -14,20 +16,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSavedItems } from "@/contexts/SavedItemsContext";
+import { useAuth } from "@/contexts/AuthContext";
+
 const BG = "#060814";
 const SURFACE = "#0B1020";
 const BORDER = "rgba(255,255,255,0.10)";
 const CARD_BG = "rgba(255,255,255,0.03)";
 
-const SUPPORT_EMAIL = "support@vexosave.com";
-const FEEDBACK_EMAIL = "feedback@vexosave.com";
+const SUPPORT_EMAIL = "support@vexoapps.com";
+const FEEDBACK_EMAIL = "hello@vexoapps.com";
 
 function openMail(to: string, subject: string) {
   Linking.openURL(`mailto:${to}?subject=${encodeURIComponent(subject)}`);
 }
 
 interface ActionRowProps {
-  icon: string;
+  icon: keyof typeof Feather.glyphMap;
   label: string;
   description: string;
   iconColor: string;
@@ -35,15 +40,34 @@ interface ActionRowProps {
   isLast?: boolean;
 }
 
-function ActionRow({ icon, label, description, iconColor, onPress, isLast }: ActionRowProps) {
+function ActionRow({
+  icon,
+  label,
+  description,
+  iconColor,
+  onPress,
+  isLast,
+}: ActionRowProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.975, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+    Animated.spring(scale, {
+      toValue: 0.975,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
   }
+
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 32, bounciness: 5 }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 32,
+      bounciness: 5,
+    }).start();
   }
+
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -57,31 +81,152 @@ function ActionRow({ icon, label, description, iconColor, onPress, isLast }: Act
         onPressOut={handlePressOut}
         style={[styles.actionRow, !isLast && styles.actionRowBorder]}
       >
-        {/* Icon container */}
-        <View style={[styles.iconWrap, { backgroundColor: iconColor + "18", borderColor: iconColor + "30" }]}>
-          <Feather name={icon as any} size={18} color={iconColor} />
+        <View
+          style={[
+            styles.iconWrap,
+            {
+              backgroundColor: iconColor + "18",
+              borderColor: iconColor + "30",
+            },
+          ]}
+        >
+          <Feather name={icon} size={18} color={iconColor} />
         </View>
 
-        {/* Text */}
         <View style={styles.actionText}>
           <Text style={styles.actionLabel}>{label}</Text>
           <Text style={styles.actionDesc}>{description}</Text>
         </View>
 
-        {/* Chevron */}
-        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.25)" />
+        <Feather
+          name="chevron-right"
+          size={16}
+          color="rgba(255,255,255,0.25)"
+        />
       </Pressable>
     </Animated.View>
   );
 }
 
+function UpcomingBlock({
+  title,
+  items,
+  onOpenItem,
+  isLast = false,
+}: {
+  title: string;
+  items: Array<{
+    id: string;
+    title: string;
+    category: string;
+    platform: string;
+    reminder?: number;
+  }>;
+  onOpenItem: (id: string) => void;
+  isLast?: boolean;
+}) {
+  return (
+    <View style={[styles.upcomingBlock, !isLast && styles.actionRowBorder]}>
+      <View style={styles.upcomingHeader}>
+        <Text style={styles.upcomingTitle}>{title}</Text>
+        <Text style={styles.upcomingCount}>{items.length}</Text>
+      </View>
+
+      {items.length === 0 ? (
+        <Text style={styles.upcomingEmpty}>Nothing here yet</Text>
+      ) : (
+        items.slice(0, 4).map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => onOpenItem(item.id)}
+            style={({ pressed }) => [
+              styles.upcomingItem,
+              pressed && styles.upcomingItemPressed,
+            ]}
+          >
+            <View style={styles.upcomingDot} />
+
+            <View style={styles.upcomingItemText}>
+              <Text style={styles.upcomingItemTitle} numberOfLines={1}>
+                {item.title}
+              </Text>
+
+              <Text style={styles.upcomingItemMeta}>
+                {item.category} · {item.platform}
+              </Text>
+            </View>
+
+            <Feather
+              name="chevron-right"
+              size={14}
+              color="rgba(255,255,255,0.25)"
+            />
+          </Pressable>
+        ))
+      )}
+    </View>
+  );
+}
+
+function startOfDay(ts: number) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export default function MoreScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { items } = useSavedItems();
+  const { mode, profile, signOut } = useAuth();
+
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 84 + 24 : insets.bottom + 90;
 
+  const now = Date.now();
+  const todayStart = startOfDay(now);
+  const tomorrowStart = todayStart + 86400000;
+  const dayAfterTomorrowStart = tomorrowStart + 86400000;
+  const weekEndExclusive = todayStart + 86400000 * 7;
+  const monthEndExclusive = todayStart + 86400000 * 30;
+
+  const futureReminderItems = items
+    .filter(
+      (item) =>
+        typeof item.reminder === "number" && item.reminder >= tomorrowStart
+    )
+    .sort((a, b) => (a.reminder || 0) - (b.reminder || 0));
+
+  const tomorrowItems = futureReminderItems.filter(
+    (item) =>
+      typeof item.reminder === "number" &&
+      item.reminder >= tomorrowStart &&
+      item.reminder < dayAfterTomorrowStart
+  );
+
+  const weekItems = futureReminderItems.filter(
+    (item) =>
+      typeof item.reminder === "number" &&
+      item.reminder >= dayAfterTomorrowStart &&
+      item.reminder < weekEndExclusive
+  );
+
+  const monthItems = futureReminderItems.filter(
+    (item) =>
+      typeof item.reminder === "number" &&
+      item.reminder >= weekEndExclusive &&
+      item.reminder < monthEndExclusive
+  );
+
+  function openItem(id: string) {
+    router.push(`/item/${id}`);
+  }
+
   return (
     <View style={styles.container}>
+      <View style={styles.glowTopLeft} pointerEvents="none" />
+      <View style={styles.glowTopRight} pointerEvents="none" />
+
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -89,13 +234,89 @@ export default function MoreScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header ── */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>More</Text>
-          <Text style={styles.headerSub}>Help, feedback & info</Text>
+          <Text style={styles.headerSub}>Help, feedback, schedule & info</Text>
         </View>
 
-        {/* ── Help & Support card ── */}
+        <View style={styles.sectionLabel}>
+          <Text style={styles.sectionLabelText}>ACCOUNT</Text>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.accountBox}>
+            <View style={styles.accountAvatar}>
+              <Feather
+                name={mode === "authenticated" ? "user-check" : "user"}
+                size={18}
+                color="#A5F3FC"
+              />
+            </View>
+
+            <View style={styles.accountText}>
+              <Text style={styles.accountName}>
+                {mode === "authenticated"
+                  ? profile?.name || "Logged in user"
+                  : "Not signed in"}
+              </Text>
+              <Text style={styles.accountEmail}>
+                {mode === "authenticated"
+                  ? profile?.email || "Google account"
+                  : "Sign in to sync your data across devices"}
+              </Text>
+            </View>
+          </View>
+
+          {mode === "authenticated" ? (
+            <ActionRow
+              icon="log-out"
+              label="Logout"
+              description="Sign out of your account"
+              iconColor="#F87171"
+              onPress={() => {
+                signOut();
+              }}
+              isLast
+            />
+          ) : (
+            <ActionRow
+              icon="log-in"
+              label="Sign in"
+              description="Open authentication"
+              iconColor="#A5F3FC"
+              onPress={() => {
+                signOut();
+              }}
+              isLast
+            />
+          )}
+        </View>
+
+        <View style={styles.sectionLabel}>
+          <Text style={styles.sectionLabelText}>UPCOMING</Text>
+        </View>
+
+        <View style={styles.card}>
+          <UpcomingBlock
+            title="Tomorrow"
+            items={tomorrowItems}
+            onOpenItem={openItem}
+          />
+
+          <UpcomingBlock
+            title="This Week"
+            items={weekItems}
+            onOpenItem={openItem}
+          />
+
+          <UpcomingBlock
+            title="This Month"
+            items={monthItems}
+            onOpenItem={openItem}
+            isLast
+          />
+        </View>
+
         <View style={styles.sectionLabel}>
           <Text style={styles.sectionLabelText}>HELP & SUPPORT</Text>
         </View>
@@ -108,13 +329,17 @@ export default function MoreScreen() {
             iconColor="#A5F3FC"
             onPress={() => openMail(SUPPORT_EMAIL, "Vexo Save — Contact")}
           />
+
           <ActionRow
             icon="help-circle"
             label="Support"
             description="Having trouble? We're here"
             iconColor="#8B5CF6"
-            onPress={() => openMail(SUPPORT_EMAIL, "Vexo Save — Support Request")}
+            onPress={() =>
+              openMail(SUPPORT_EMAIL, "Vexo Save — Support Request")
+            }
           />
+
           <ActionRow
             icon="message-square"
             label="Send Feedback"
@@ -125,22 +350,18 @@ export default function MoreScreen() {
           />
         </View>
 
-        {/* ── About card ── */}
         <View style={styles.sectionLabel}>
           <Text style={styles.sectionLabelText}>ABOUT</Text>
         </View>
 
         <View style={styles.card}>
           <View style={styles.aboutRow}>
-            {/* Mini gradient badge */}
-            <LinearGradient
-              colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.aboutGradientBadge}
-            >
-              <Feather name="bookmark" size={14} color="#fff" />
-            </LinearGradient>
+            <Image
+              source={require("../../assets/images/vexo-app-icon.png")}
+              style={styles.aboutAppIcon}
+              resizeMode="cover"
+            />
+
             <View style={styles.aboutText}>
               <Text style={styles.aboutAppName}>Vexo Save</Text>
               <Text style={styles.aboutVersion}>Version 1.0 · MVP</Text>
@@ -150,15 +371,13 @@ export default function MoreScreen() {
           <View style={styles.divider} />
 
           <Text style={styles.aboutTagline}>
-            Save. Organize. Find.{"\n"}
+            Save. Organize. Find.
+            {"\n"}
             Your personal video library — always in your pocket.
           </Text>
         </View>
 
-        {/* ── Support email hint ── */}
-        <Text style={styles.footerHint}>
-          📬  {SUPPORT_EMAIL}
-        </Text>
+        <Text style={styles.footerHint}>📬 {SUPPORT_EMAIL}</Text>
       </ScrollView>
     </View>
   );
@@ -166,15 +385,43 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  content: { paddingHorizontal: 20, gap: 10 },
 
-  header: { marginBottom: 8 },
+  glowTopLeft: {
+    position: "absolute",
+    top: -40,
+    left: -40,
+    width: 180,
+    height: 180,
+    borderRadius: 999,
+    backgroundColor: "rgba(123,98,220,0.11)",
+  },
+
+  glowTopRight: {
+    position: "absolute",
+    top: 120,
+    right: -50,
+    width: 190,
+    height: 190,
+    borderRadius: 999,
+    backgroundColor: "rgba(34,211,238,0.07)",
+  },
+
+  content: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+
+  header: {
+    marginBottom: 8,
+  },
+
   headerTitle: {
     fontSize: 34,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
     letterSpacing: -0.8,
   },
+
   headerSub: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
@@ -182,7 +429,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  sectionLabel: { paddingHorizontal: 4, marginTop: 6 },
+  sectionLabel: {
+    paddingHorizontal: 4,
+    marginTop: 6,
+  },
+
   sectionLabelText: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
@@ -197,6 +448,106 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     overflow: "hidden",
   },
+  accountBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: CARD_BG,
+  },
+  accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(165,243,252,0.30)",
+    backgroundColor: "rgba(34,211,238,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accountText: {
+    flex: 1,
+  },
+  accountName: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  accountEmail: {
+    marginTop: 2,
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+
+  upcomingBlock: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: CARD_BG,
+  },
+
+  upcomingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  upcomingTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#FFFFFF",
+  },
+
+  upcomingCount: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.40)",
+  },
+
+  upcomingEmpty: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.35)",
+  },
+
+  upcomingItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+
+  upcomingItemPressed: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  upcomingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: "#8B5CF6",
+    marginTop: 6,
+  },
+
+  upcomingItemText: {
+    flex: 1,
+  },
+
+  upcomingItemTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.88)",
+  },
+
+  upcomingItemMeta: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.38)",
+    marginTop: 2,
+  },
 
   actionRow: {
     flexDirection: "row",
@@ -206,10 +557,12 @@ const styles = StyleSheet.create({
     gap: 14,
     backgroundColor: CARD_BG,
   },
+
   actionRowBorder: {
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
   },
+
   iconWrap: {
     width: 38,
     height: 38,
@@ -218,66 +571,74 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  actionText: { flex: 1, gap: 2 },
+
+  actionText: {
+    flex: 1,
+    gap: 2,
+  },
+
   actionLabel: {
     fontSize: 15,
     fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.92)",
+    color: "#FFFFFF",
   },
+
   actionDesc: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.40)",
+    color: "rgba(255,255,255,0.38)",
   },
 
   aboutRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 14,
-    gap: 14,
+    padding: 16,
+    gap: 12,
+    backgroundColor: CARD_BG,
   },
-  aboutGradientBadge: {
-    width: 42,
-    height: 42,
+
+  aboutAppIcon: {
+    width: 52,
+    height: 52,
     borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  aboutText: { flex: 1 },
+
+  aboutText: {
+    flex: 1,
+  },
+
   aboutAppName: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
     color: "#FFFFFF",
-    letterSpacing: -0.2,
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
+
   aboutVersion: {
+    marginTop: 2,
+    color: "rgba(255,255,255,0.38)",
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.40)",
-    marginTop: 2,
   },
+
   divider: {
     height: 1,
     backgroundColor: BORDER,
-    marginHorizontal: 16,
   },
+
   aboutTagline: {
+    padding: 16,
+    color: "rgba(255,255,255,0.58)",
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.45)",
     lineHeight: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    fontFamily: "Inter_400Regular",
+    backgroundColor: CARD_BG,
   },
 
   footerHint: {
+    textAlign: "center",
+    marginTop: 14,
+    color: "rgba(255,255,255,0.28)",
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: "rgba(165,243,252,0.50)",
-    textAlign: "center",
-    marginTop: 8,
-    paddingBottom: 8,
   },
 });

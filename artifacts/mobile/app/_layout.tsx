@@ -6,13 +6,16 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { Linking } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { AuthScreenContent } from "@/app/auth";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SavedItemsProvider } from "@/contexts/SavedItemsContext";
 import { useColors } from "@/hooks/useColors";
@@ -23,6 +26,48 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const colors = useColors();
+  const { mode, isHydrated } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isHydrated || mode === null) return;
+
+    const extractFirstHttpUrl = (text: string): string | undefined => {
+      const match = text.match(/https?:\/\/[^\s<>"')\]}]+/i);
+      if (!match?.[0]) return undefined;
+      return match[0].replace(/[),.;!?]+$/, "");
+    };
+
+    const routeToAddFromIncoming = (incoming: string | null) => {
+      if (!incoming || pathname === "/add") return;
+
+      let candidate: string | undefined;
+      const trimmed = incoming.trim();
+      if (/^vexo:\/\/add/i.test(trimmed)) return;
+      if (/^https?:\/\//i.test(trimmed)) {
+        candidate = trimmed;
+      } else {
+        candidate = extractFirstHttpUrl(trimmed);
+      }
+
+      if (!candidate) return;
+      router.push(`/add?url=${encodeURIComponent(candidate)}`);
+    };
+
+    Linking.getInitialURL()
+      .then(routeToAddFromIncoming)
+      .catch(() => undefined);
+
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      routeToAddFromIncoming(url);
+    });
+
+    return () => sub.remove();
+  }, [isHydrated, mode, pathname, router]);
+
+  if (!isHydrated) return null;
+  if (mode === null) return <AuthScreenContent />;
 
   return (
     <Stack
@@ -81,9 +126,11 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <SavedItemsProvider>
-                <RootLayoutNav />
-              </SavedItemsProvider>
+              <AuthProvider>
+                <SavedItemsProvider>
+                  <RootLayoutNav />
+                </SavedItemsProvider>
+              </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

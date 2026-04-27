@@ -56,6 +56,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
-    "@react-native-community/datetimepicker": "^8.4.4"
+    "@react-native-community/datetimepicker": "^8.4.4",
+    "@supabase/supabase-js": "^2.104.1",
+    "react-native-url-polyfill": "^3.0.0"
   }
 }

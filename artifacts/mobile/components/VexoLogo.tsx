@@ -1,46 +1,52 @@
 import React from "react";
-import { Image, Platform, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 
-interface VexoLogoProps {
-  height?: number;
-}
-
-// Vexo logo using the transparency-stripped PNG.
-// The ~2.75:1 aspect ratio (logo is wide, not square).
-export function VexoLogo({ height = 36 }: VexoLogoProps) {
-  const width = Math.round(height * 2.75);
-
+export function VexoLogo() {
   return (
-    <View
-      style={[
-        styles.wrap,
-        { width, height },
-        // Native shadow — does NOT create a box artifact on mobile
-        Platform.OS !== "web" && {
-          shadowColor: "#9B7EFA",
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.7,
-          shadowRadius: 12,
-          elevation: 0,
-        },
-      ]}
-    >
+    <View style={styles.wrapper}>
+      <View style={styles.blueGlowOuter} pointerEvents="none" />
+      <View style={styles.blueGlowInner} pointerEvents="none" />
+
       <Image
-        source={require("../assets/vexo-logo-transparent.png")}
-        style={styles.image}
+        source={require("../assets/images/vexo-logo-muted-cropped.png")}
+        style={styles.logo}
         resizeMode="contain"
-        fadeDuration={0}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: "transparent",
+  wrapper: {
+    width: 220,
+    height: 86,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
   },
-  image: {
-    width: "100%",
-    height: "100%",
+
+  blueGlowOuter: {
+    position: "absolute",
+    left: 8,
+    top: 14,
+    width: 98,
+    height: 98,
+    borderRadius: 999,
+    backgroundColor: "rgba(98,110,220,0.12)",
+  },
+
+  blueGlowInner: {
+    position: "absolute",
+    right: 12,
+    top: 20,
+    width: 82,
+    height: 82,
+    borderRadius: 999,
+    backgroundColor: "rgba(34,211,238,0.09)",
+  },
+
+  logo: {
+    width: 220,
+    height: 86,
   },
 });

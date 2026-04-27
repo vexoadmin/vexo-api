@@ -1,8 +1,15 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import React, { useRef, useState } from "react";
-import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { SavedItem } from "@/contexts/SavedItemsContext";
 
@@ -38,128 +45,249 @@ const CARD_BG = "rgba(255,255,255,0.04)";
 
 function extractDomain(url: string): string {
   try {
-    const { hostname } = new URL(url);
+    const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const { hostname } = new URL(normalized);
     return hostname.replace(/^www\./, "");
   } catch {
     return url.slice(0, 24);
   }
 }
 
+function buildFavicon(url: string): string | null {
+  const domain = extractDomain(url);
+  if (!domain || !domain.includes(".")) return null;
+  return `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(
+    domain
+  )}`;
+}
+
+function extractYouTubeId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      return parsed.pathname.split("/").filter(Boolean)[0] ?? null;
+    }
+
+    if (host.includes("youtube.com")) {
+      const v = parsed.searchParams.get("v");
+      if (v) return v;
+
+      const parts = parsed.pathname.split("/").filter(Boolean);
+
+      const shortsIndex = parts.indexOf("shorts");
+      if (shortsIndex >= 0 && parts[shortsIndex + 1]) {
+        return parts[shortsIndex + 1];
+      }
+
+      const embedIndex = parts.indexOf("embed");
+      if (embedIndex >= 0 && parts[embedIndex + 1]) {
+        return parts[embedIndex + 1];
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function buildYouTubeCandidates(
+  url: string,
+  existingThumbnailUrl?: string | null
+): string[] {
+  const candidates: string[] = [];
+
+  if (existingThumbnailUrl && existingThumbnailUrl.trim()) {
+    candidates.push(existingThumbnailUrl.trim());
+  }
+
+  const videoId = extractYouTubeId(url);
+
+  if (videoId) {
+    candidates.push(
+      `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+      `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
+    );
+  }
+
+  return Array.from(new Set(candidates));
+}
+
+function buildThumbnailCandidates(item: SavedItem): string[] {
+  const existing = item.thumbnailUrl?.trim();
+
+  if (item.platform === "youtube") {
+    return buildYouTubeCandidates(item.url, existing);
+  }
+
+  const favicon = buildFavicon(item.url);
+  return Array.from(new Set([existing, favicon].filter(Boolean) as string[]));
+}
+
 interface VideoCardProps {
   item: SavedItem;
   onPress: () => void;
+  onLongPress?: () => void;
+  isSelected?: boolean;
+  selectionMode?: boolean;
   isLarge?: boolean;
 }
 
-export function VideoCard({ item, onPress, isLarge }: VideoCardProps) {
+export function VideoCard({
+  item,
+  onPress,
+  onLongPress,
+  isSelected = false,
+  selectionMode = false,
+  isLarge = false,
+}: VideoCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const thumbHeight = isLarge ? 200 : 136;
+
+  const thumbnailCandidates = useMemo(
+    () => buildThumbnailCandidates(item),
+    [item.thumbnailUrl, item.url, item.platform]
+  );
+
+  const [candidateIndex, setCandidateIndex] = useState(0);
   const [thumbError, setThumbError] = useState(false);
 
-  /* Reset error state whenever the thumbnail URL changes (e.g. after background repair) */
-  React.useEffect(() => {
+  useEffect(() => {
+    setCandidateIndex(0);
     setThumbError(false);
-  }, [item.thumbnailUrl]);
+  }, [item.thumbnailUrl, item.url, item.platform]);
 
+  const activeThumbnailUrl = thumbnailCandidates[candidateIndex] ?? null;
   const platformColor = PLATFORM_COLORS[item.platform] ?? "#8B5CF6";
   const platformIcon = PLATFORM_ICONS[item.platform] ?? "link";
+  const platformLabel = PLATFORM_LABELS[item.platform] ?? "Website";
   const domain = extractDomain(item.url);
 
   function handlePressIn() {
-    Animated.spring(scale, { toValue: 0.965, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+    Animated.spring(scale, {
+      toValue: 0.965,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
   }
+
   function handlePressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 32, bounciness: 6 }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 32,
+      bounciness: 6,
+    }).start();
   }
+
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  
+    // אם במצב בחירה – רק select
+    if (selectionMode) {
+      onPress();
+      return;
+    }
+  
     onPress();
   }
+
+  function handleLongPress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onLongPress?.();
+  }
+
+  function handleImageError() {
+    const hasAnother = candidateIndex < thumbnailCandidates.length - 1;
+
+    if (hasAnother) {
+      setCandidateIndex((prev) => prev + 1);
+      setThumbError(false);
+    } else {
+      setThumbError(true);
+    }
+  }
+
+  const showRealThumbnail = !!activeThumbnailUrl && !thumbError;
 
   return (
     <Animated.View style={[styles.wrapper, { transform: [{ scale }] }]}>
       <Pressable
         onPress={handlePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.card}
+        onLongPress={handleLongPress}
+        delayLongPress={300}
+        onPressIn={!selectionMode ? handlePressIn : undefined}
+        onPressOut={!selectionMode ? handlePressOut : undefined}
+        style={[
+          styles.card,
+          isSelected ? styles.cardSelected : null,
+        ]}
       >
-        {/* ── Thumbnail area ── */}
         <View style={[styles.thumb, { height: thumbHeight }]}>
-          {item.thumbnailUrl && !thumbError ? (
-            /* ── Real thumbnail ── */
+          {showRealThumbnail ? (
             <>
               <Image
-                source={{ uri: item.thumbnailUrl }}
+                source={{ uri: activeThumbnailUrl }}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
-                onError={() => setThumbError(true)}
+                onError={handleImageError}
               />
-              {/* Bottom scrim so pills are readable */}
               <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.60)"]}
-                start={{ x: 0, y: 0.4 }}
-                end={{ x: 0, y: 1 }}
+                colors={["transparent", "rgba(0,0,0,0.6)"]}
                 style={StyleSheet.absoluteFill}
               />
             </>
           ) : (
-            /* ── Styled fallback — NEVER blank ── */
             <>
-              {/* Base gradient */}
               <LinearGradient
                 colors={["#D946EF22", "#8B5CF618", "#22D3EE22"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              {/* Top-left glow */}
-              <LinearGradient
-                colors={[platformColor + "28", "transparent"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0.7, y: 0.7 }}
-                style={StyleSheet.absoluteFill}
-              />
-              {/* Centered icon + domain */}
               <View style={styles.fallbackCenter}>
-                <View style={[styles.fallbackIconWrap, { borderColor: platformColor + "55", backgroundColor: platformColor + "18" }]}>
-                  <Feather name={platformIcon as any} size={22} color={platformColor} />
-                </View>
-                <Text style={[styles.fallbackDomain, { color: platformColor + "CC" }]} numberOfLines={1}>
+                <Feather
+                  name={platformIcon as any}
+                  size={26}
+                  color={platformColor}
+                />
+                <Text style={styles.fallbackPlatform}>{platformLabel}</Text>
+                <Text style={[styles.fallbackDomain, { color: platformColor }]}>
                   {domain}
-                </Text>
-              </View>
-              {/* Bottom-right platform badge */}
-              <View style={styles.fallbackBadge}>
-                <Text style={[styles.fallbackBadgeText, { color: platformColor }]}>
-                  {PLATFORM_LABELS[item.platform]}
                 </Text>
               </View>
             </>
           )}
 
-          {/* Reminder dot */}
-          {item.reminder && item.reminder > Date.now() && (
-            <View style={styles.reminderDot} />
-          )}
-
-          {/* Category pill — bottom left */}
           <View style={styles.catPill}>
             <Text style={styles.catPillText}>{item.category}</Text>
           </View>
+
+          {selectionMode ? (
+            <View style={styles.selectionOverlay}>
+              <View
+                style={[
+                  styles.selectionCircle,
+                  isSelected ? styles.selectionCircleActive : null,
+                ]}
+              >
+                {isSelected ? (
+                  <Feather name="check" size={16} color="#FFFFFF" />
+                ) : null}
+              </View>
+            </View>
+          ) : null}
         </View>
 
-        {/* ── Text area below thumbnail ── */}
         <View style={styles.textArea}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-            <Text style={[styles.source, { color: platformColor + "CC" }]}>
-              {PLATFORM_LABELS[item.platform]}
-            </Text>
-          </View>
-          {item.notes ? (
-            <Text style={styles.note} numberOfLines={1}>{item.notes}</Text>
-          ) : null}
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={[styles.source, { color: platformColor }]}>
+            {platformLabel}
+          </Text>
         </View>
       </Pressable>
     </Animated.View>
@@ -170,6 +298,7 @@ const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 10,
   },
+
   card: {
     borderRadius: 24,
     overflow: "hidden",
@@ -178,104 +307,92 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG,
     padding: 8,
   },
+
+  cardSelected: {
+    borderColor: "rgba(139,92,246,0.85)",
+    backgroundColor: "rgba(139,92,246,0.10)",
+  },
+
   thumb: {
     borderRadius: 18,
     overflow: "hidden",
     position: "relative",
   },
 
-  /* Fallback layout */
   fallbackCenter: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-  },
-  fallbackIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fallbackDomain: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    letterSpacing: 0.2,
-    maxWidth: "75%",
-    textAlign: "center",
-  },
-  fallbackBadge: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "rgba(0,0,0,0.38)",
-    borderRadius: 10,
+    gap: 6,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  fallbackBadgeText: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.4,
   },
 
-  reminderDot: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#22D3EE",
-    opacity: 0.9,
+  fallbackDomain: {
+    fontSize: 12,
+    textAlign: "center",
+    fontFamily: "Inter_500Medium",
   },
+
+  fallbackPlatform: {
+    fontSize: 13,
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+  },
+
   catPill: {
     position: "absolute",
     bottom: 8,
     left: 8,
-    backgroundColor: "rgba(0,0,0,0.50)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
+
   catPillText: {
     fontSize: 11,
+    color: "#FFFFFF",
     fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.90)",
   },
+
+  selectionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.28)",
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    padding: 8,
+  },
+
+  selectionCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.70)",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  selectionCircleActive: {
+    borderColor: "#8B5CF6",
+    backgroundColor: "#8B5CF6",
+  },
+
   textArea: {
-    paddingHorizontal: 4,
-    paddingTop: 10,
-    paddingBottom: 2,
-    gap: 4,
+    paddingTop: 8,
   },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 6,
-  },
+
   title: {
-    flex: 1,
     fontSize: 13,
+    color: "#FFFFFF",
     fontFamily: "Inter_500Medium",
     lineHeight: 18,
-    color: "rgba(255,255,255,0.95)",
   },
+
   source: {
     fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    marginTop: 1,
-    flexShrink: 0,
-  },
-  note: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.50)",
-    lineHeight: 15,
+    fontFamily: "Inter_500Medium",
+    marginTop: 2,
   },
 });

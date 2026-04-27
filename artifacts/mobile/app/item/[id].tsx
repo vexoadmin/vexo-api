@@ -1,9 +1,9 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
-import React, { useState } from "react";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -16,30 +16,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
-import { useSavedItems, Category } from "@/contexts/SavedItemsContext";
+import { useSavedItems } from "@/contexts/SavedItemsContext";
 
-function normalizeUrl(url: string): string {
-  if (!url) return url;
-  if (/^https?:\/\//i.test(url)) return url;
-  return "https://" + url;
-}
-
-function openUrl(url: string) {
-  const full = normalizeUrl(url);
-  if (Platform.OS === "web") {
-    window.open(full, "_blank");
-  } else {
-    Linking.openURL(full);
-  }
-}
-
-const BG = "#060814";
-const SURFACE = "#0B1020";
+const BG = "#040812";
 const BORDER = "rgba(255,255,255,0.10)";
-const CARD_BG = "rgba(255,255,255,0.03)";
-
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   tiktok: "TikTok",
@@ -48,7 +29,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   website: "Website",
   pinterest: "Pinterest",
 };
-const PLATFORM_ICONS: Record<string, string> = {
+const PLATFORM_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
   youtube: "play-circle",
   tiktok: "video",
   instagram: "camera",
@@ -56,7 +37,6 @@ const PLATFORM_ICONS: Record<string, string> = {
   website: "globe",
   pinterest: "bookmark",
 };
-
 const PLATFORM_COLORS: Record<string, string> = {
   youtube: "#EF4444",
   tiktok: "#22D3EE",
@@ -66,895 +46,879 @@ const PLATFORM_COLORS: Record<string, string> = {
   pinterest: "#E60023",
 };
 
-function extractDomain(url: string): string {
-  try {
-    const { hostname } = new URL(url);
-    return hostname.replace(/^www\./, "");
-  } catch {
-    return url.slice(0, 24);
-  }
-}
-
-function formatDate(ts: number) {
-  return new Date(ts).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-  });
-}
-
-function formatReminder(ts: number) {
-  const now = Date.now();
-  const diff = ts - now;
-  const days = Math.ceil(diff / 86400000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  if (days < 7) return `In ${days} days`;
-  return new Date(ts).toLocaleDateString("en-US", {
-    weekday: "short", month: "short", day: "numeric",
-  });
-}
-
-const REMINDER_QUICK = [
-  { label: "Tomorrow",  getValue: () => Date.now() + 86400000 },
+const QUICK_REMINDERS = [
+  { label: "Tomorrow", getValue: () => Date.now() + 86400000 },
+  {
+    label: "Weekend",
+    getValue: () => {
+      const now = new Date();
+      const day = now.getDay();
+      const daysUntilSat = (6 - day + 7) % 7 || 7;
+      return Date.now() + daysUntilSat * 86400000;
+    },
+  },
   { label: "Next week", getValue: () => Date.now() + 7 * 86400000 },
 ];
 
-export default function ItemDetailScreen() {
-  const insets = useSafeAreaInsets();
+function sameDay(a?: number, b?: number) {
+  if (!a || !b) return false;
+
+  const da = new Date(a);
+  const db = new Date(b);
+
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+function formatReminder(ts?: number) {
+  if (!ts) return "No reminder";
+
+  return new Date(ts).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function extractDomain(url: string): string {
+  try {
+    const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const parsed = new URL(normalized);
+    return parsed.hostname.replace(/^www\./, "");
+  } catch {
+    return "Saved link";
+  }
+}
+
+export default function ItemScreen() {
+  const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const { items, categories, updateItem, deleteItem } = useSavedItems();
 
-  const item = items.find((i) => i.id === id);
-  const [thumbError, setThumbError] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+  const itemId = Array.isArray(id) ? id[0] : id;
 
-  /* ── Edit mode ── */
-  const [editMode, setEditMode] = useState(false);
-  const [editTitle, setEditTitle] = useState(item?.title || "");
-  const [editCategory, setEditCategory] = useState(item?.category || "");
-  const [editNotes, setEditNotes] = useState(item?.notes || "");
-  const [editReminder, setEditReminder] = useState<number | undefined>(item?.reminder);
-  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const item = useMemo(() => {
+    return items.find((savedItem) => savedItem.id === itemId);
+  }, [items, itemId]);
 
-  /* ── Notes inline (view-mode only) ── */
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [notes, setNotes] = useState(item?.notes || "");
-  const [editingReminder, setEditingReminder] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 20;
+  const [editing, setEditing] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState<"view" | "edit" | null>(
+    null
+  );
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftCategory, setDraftCategory] = useState("");
+  const [draftNotes, setDraftNotes] = useState("");
+  const [draftReminder, setDraftReminder] = useState<number | undefined>();
 
   if (!item) {
     return (
-      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ color: "#FFFFFF" }}>Item not found</Text>
+      <View style={styles.center}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={styles.notFoundText}>Item not found</Text>
+
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backBtnText}>Go back</Text>
+        </Pressable>
       </View>
     );
   }
 
-  const hasReminder = !!(item.reminder && item.reminder > Date.now());
+  const currentItem = item;
+  const platformColor = PLATFORM_COLORS[currentItem.platform] ?? "#8B5CF6";
+  const platformIcon = PLATFORM_ICONS[currentItem.platform] ?? "link";
+  const platformLabel = PLATFORM_LABELS[currentItem.platform] ?? "Website";
+  const domain = extractDomain(currentItem.url);
 
-  function handleOpenLink() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    openUrl(item!.url);
+  function startEdit() {
+    setDraftTitle(currentItem.title || "");
+    setDraftCategory(currentItem.category || categories[0]?.name || "");
+    setDraftNotes(currentItem.notes || "");
+    setDraftReminder(currentItem.reminder);
+    setEditing(true);
   }
 
-  function handleSaveNotes() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateItem(item!.id, { notes });
-    setEditingNotes(false);
+  function cancelEdit() {
+    setEditing(false);
+    setShowDatePicker(null);
   }
 
-  function handleSetReminder(ts: number) {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateItem(item!.id, { reminder: ts });
-    setEditingReminder(false);
-    setShowDatePicker(false);
+  function saveEdit() {
+    updateItem(currentItem.id, {
+      title: draftTitle.trim() || currentItem.title,
+      category: draftCategory,
+      notes: draftNotes.trim(),
+      reminder: draftReminder,
+    });
+
+    setEditing(false);
+    setShowDatePicker(null);
   }
 
-  function handleClearReminder() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    updateItem(item!.id, { reminder: undefined });
-    setEditingReminder(false);
-    setShowDatePicker(false);
+  function setQuickReminder(ts: number) {
+    updateItem(currentItem.id, { reminder: ts });
   }
 
-  function handleDelete() {
-    Alert.alert("Delete Video", "Remove this saved video?", [
+  function clearReminder() {
+    updateItem(currentItem.id, { reminder: undefined });
+  }
+
+  function openLink() {
+    if (!currentItem.url) return;
+
+    Linking.openURL(currentItem.url).catch(() => {
+      Alert.alert("Could not open link", "Please try again later.");
+    });
+  }
+
+  function removeItem() {
+    Alert.alert("Delete item", "Are you sure you want to delete this item?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          deleteItem(item!.id);
+          deleteItem(currentItem.id);
           router.back();
         },
       },
     ]);
   }
 
-  function handleEnterEdit() {
-    setEditTitle(item!.title);
-    setEditCategory(item!.category);
-    setEditNotes(item!.notes || "");
-    setEditReminder(item!.reminder);
-    setShowEditDatePicker(false);
-    setEditingNotes(false);
-    setEditingReminder(false);
-    setShowMenu(false);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setEditMode(true);
-  }
-
-  function handleSaveEdit() {
-    if (!editTitle.trim()) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateItem(item!.id, {
-      title: editTitle.trim(),
-      category: editCategory,
-      notes: editNotes.trim(),
-      reminder: editReminder,
-    });
-    setNotes(editNotes.trim());
-    setEditMode(false);
-  }
-
-  function handleCancelEdit() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setEditMode(false);
-  }
-
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── 1. Hero thumbnail card ── */}
-        <View style={styles.heroCard}>
-          {/* Thumbnail */}
-          <View style={styles.thumb}>
-            {item.thumbnailUrl && !thumbError ? (
-              <>
-                <Image
-                  source={{ uri: item.thumbnailUrl }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                  onError={() => setThumbError(true)}
-                />
-                {/* Scrim for overlay readability */}
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.15)", "rgba(0,0,0,0.55)"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </>
-            ) : (
-              /* ── Styled fallback — never blank ── */
-              <>
-                <LinearGradient
-                  colors={["#22D3EE22", "#8B5CF618", "#D946EF22"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={[(PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "30", "transparent"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0.7, y: 0.7 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                {/* Centered icon + domain */}
-                <View style={styles.heroFallbackCenter}>
-                  <View style={[
-                    styles.heroFallbackIconWrap,
-                    {
-                      borderColor: (PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "55",
-                      backgroundColor: (PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "20",
-                    },
-                  ]}>
-                    <Feather
-                      name={(PLATFORM_ICONS[item.platform] ?? "link") as any}
-                      size={30}
-                      color={PLATFORM_COLORS[item.platform] ?? "#8B5CF6"}
-                    />
-                  </View>
-                  <Text style={[styles.heroFallbackDomain, { color: (PLATFORM_COLORS[item.platform] ?? "#8B5CF6") + "CC" }]}>
-                    {extractDomain(item.url)}
-                  </Text>
-                </View>
-              </>
-            )}
-            {/* Category pill — top left */}
-            <View style={styles.heroCatPill}>
-              <Text style={styles.heroPillText}>{item.category}</Text>
-            </View>
-            {/* Platform pill — top right */}
-            <View style={styles.heroSrcPill}>
-              <Text style={styles.heroSrcText}>{PLATFORM_LABELS[item.platform]}</Text>
-            </View>
-            {/* Center play button */}
-            <Pressable onPress={handleOpenLink} style={styles.playWrap}>
-              <View style={styles.playRing}>
-                <Feather name="play" size={22} color="#fff" style={{ marginLeft: 3 }} />
-              </View>
-            </Pressable>
-          </View>
+      <Stack.Screen options={{ headerShown: false }} />
 
-          {/* Title + date row */}
-          <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
-              {editMode ? (
-                <TextInput
-                  value={editTitle}
-                  onChangeText={setEditTitle}
-                  style={styles.titleInput}
-                  placeholderTextColor="rgba(255,255,255,0.30)"
-                  placeholder="Title"
-                  autoFocus
-                  returnKeyType="done"
-                />
-              ) : (
-                <Text style={styles.itemTitle}>{item.title}</Text>
-              )}
-              <Text style={styles.savedDate}>Saved on {formatDate(item.createdAt)}</Text>
-            </View>
-            {!editMode && (
-              <Pressable
-                onPress={() => setShowMenu(!showMenu)}
-                style={styles.menuBtn}
-                hitSlop={8}
-              >
-                <Text style={styles.menuDots}>⋯</Text>
-              </Pressable>
-            )}
-          </View>
-          {showMenu && !editMode && (
-            <Pressable onPress={handleDelete} style={styles.deleteRow}>
-              <Feather name="trash-2" size={13} color="#EF4444" />
-              <Text style={styles.deleteText}>Delete item</Text>
-            </Pressable>
-          )}
+      <LinearGradient
+        colors={["#031020", "#051120", BG]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 28 },
+        ]}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Feather name="arrow-left" size={28} color="#fff" />
+          </Pressable>
+
+          <Text style={styles.headerTitle}>Video Details</Text>
+
+          <Pressable onPress={editing ? cancelEdit : startEdit} hitSlop={12}>
+            <Feather name={editing ? "x" : "edit-2"} size={24} color="#fff" />
+          </Pressable>
         </View>
 
-        {/* ── 2. Edit mode: Category picker ── */}
-        {editMode && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabelUppercase}>CATEGORY</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-            >
-              {categories.map((cat: Category) => {
-                const selected = editCategory === cat.name;
+        <Pressable onPress={openLink} style={styles.imageWrap}>
+          {currentItem.thumbnailUrl ? (
+            <Image
+              source={{ uri: currentItem.thumbnailUrl }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : (
+            <>
+              <LinearGradient
+                colors={["#D946EF22", "#8B5CF618", "#22D3EE22"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.imageFallback}>
+                <View
+                  style={[
+                    styles.fallbackIconWrap,
+                    {
+                      borderColor: `${platformColor}60`,
+                      backgroundColor: `${platformColor}20`,
+                    },
+                  ]}
+                >
+                  <Feather name={platformIcon} size={26} color={platformColor} />
+                </View>
+                <Text style={styles.fallbackPlatform}>{platformLabel}</Text>
+                <Text style={styles.fallbackDomain}>{domain}</Text>
+              </View>
+            </>
+          )}
+
+          <View style={styles.badgeLeft}>
+            <Text style={styles.badgeText}>{currentItem.category}</Text>
+          </View>
+
+          <View style={styles.badgeRight}>
+            <Text style={styles.platformText}>
+              {currentItem.platform.toUpperCase()}
+            </Text>
+          </View>
+
+          <View style={styles.playCircle}>
+            <Feather
+              name="play"
+              size={22}
+              color="#fff"
+              style={{ marginLeft: 2 }}
+            />
+          </View>
+        </Pressable>
+
+        <Text style={styles.title} numberOfLines={4}>
+          {currentItem.title || "Untitled"}
+        </Text>
+
+        {!editing ? (
+          <>
+            <View style={styles.quickCard}>
+              <Pressable style={styles.editBtn} onPress={startEdit}>
+                <Feather name="edit-2" size={15} color="#fff" />
+                <Text style={styles.editBtnText}>Edit details</Text>
+              </Pressable>
+
+              <Text style={styles.remindLabel}>Remind me</Text>
+
+              <View style={styles.reminderRow}>
+                {QUICK_REMINDERS.map((r) => {
+                  const value = r.getValue();
+                  const active = sameDay(currentItem.reminder, value);
+
+                  return (
+                    <Pressable
+                      key={r.label}
+                      onPress={() => setQuickReminder(value)}
+                      style={[
+                        styles.reminderBtn,
+                        active && styles.reminderBtnActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.reminderText,
+                          active && styles.reminderTextActive,
+                        ]}
+                      >
+                        {r.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+
+                <Pressable
+                  onPress={() => setShowDatePicker("view")}
+                  style={styles.reminderBtnCustom}
+                >
+                  <Text style={styles.reminderText}>Pick date</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.label}>PERSONAL NOTE</Text>
+              <Text style={styles.text}>
+                {currentItem.notes?.trim()
+                  ? currentItem.notes
+                  : "No notes yet. Tap Edit details to add one."}
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.label}>REMINDER</Text>
+
+                {currentItem.reminder ? (
+                  <Pressable onPress={clearReminder} style={styles.clearPill}>
+                    <Text style={styles.clearPillText}>Clear</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <Text
+                style={currentItem.reminder ? styles.reminderDate : styles.text}
+              >
+                {currentItem.reminder
+                  ? `🔔 ${formatReminder(currentItem.reminder)}`
+                  : "No reminder set"}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.editPanel}>
+            <Text style={styles.editTitle}>Edit item</Text>
+
+            <Text style={styles.label}>TITLE</Text>
+            <TextInput
+              value={draftTitle}
+              onChangeText={setDraftTitle}
+              placeholder="Title"
+              placeholderTextColor="rgba(255,255,255,0.28)"
+              style={styles.input}
+            />
+
+            <Text style={styles.label}>CATEGORY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.categoryRow}>
+                {categories.map((cat) => {
+                  const active = draftCategory === cat.name;
+
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      onPress={() => setDraftCategory(cat.name)}
+                      style={[
+                        styles.categoryChip,
+                        active && styles.categoryChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryText,
+                          active && styles.categoryTextActive,
+                        ]}
+                      >
+                        {cat.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.label}>NOTES</Text>
+            <TextInput
+              value={draftNotes}
+              onChangeText={setDraftNotes}
+              placeholder="Add notes..."
+              placeholderTextColor="rgba(255,255,255,0.28)"
+              style={styles.textArea}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.label}>REMIND ME</Text>
+            <View style={styles.reminderRow}>
+              {QUICK_REMINDERS.map((r) => {
+                const value = r.getValue();
+                const active = sameDay(draftReminder, value);
+
                 return (
                   <Pressable
-                    key={cat.name}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setEditCategory(cat.name);
-                    }}
+                    key={r.label}
+                    onPress={() => setDraftReminder(value)}
                     style={[
-                      styles.catChip,
-                      selected && {
-                        backgroundColor: cat.color + "22",
-                        borderColor: cat.color + "70",
-                      },
+                      styles.reminderBtn,
+                      active && styles.reminderBtnActive,
                     ]}
                   >
-                    <Feather
-                      name={cat.icon as any}
-                      size={13}
-                      color={selected ? cat.color : "rgba(255,255,255,0.55)"}
-                    />
-                    <Text style={[styles.catChipText, selected && { color: cat.color }]}>
-                      {cat.name}
+                    <Text
+                      style={[
+                        styles.reminderText,
+                        active && styles.reminderTextActive,
+                      ]}
+                    >
+                      {r.label}
                     </Text>
                   </Pressable>
                 );
               })}
-            </ScrollView>
-          </View>
-        )}
 
-        {/* ── 3. Notes ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Personal note</Text>
-            {!editMode && (
               <Pressable
-                onPress={() => { if (editingNotes) handleSaveNotes(); else setEditingNotes(true); }}
-                style={[styles.smallBtn, editingNotes && styles.smallBtnActive]}
+                onPress={() => setShowDatePicker("edit")}
+                style={styles.reminderBtnCustom}
               >
-                <Text style={[styles.smallBtnText, editingNotes && { color: "#fff" }]}>
-                  {editingNotes ? "Save" : "Edit"}
-                </Text>
+                <Text style={styles.reminderText}>Pick date</Text>
               </Pressable>
-            )}
-          </View>
-          {editMode ? (
-            <TextInput
-              value={editNotes}
-              onChangeText={setEditNotes}
-              placeholder="Write your thoughts..."
-              placeholderTextColor="rgba(255,255,255,0.25)"
-              style={styles.notesInput}
-              multiline
-              textAlignVertical="top"
-            />
-          ) : editingNotes ? (
-            <TextInput
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Write your thoughts..."
-              placeholderTextColor="rgba(255,255,255,0.25)"
-              style={styles.notesInput}
-              multiline
-              textAlignVertical="top"
-              autoFocus
-            />
-          ) : (
-            <Text style={[styles.notesText, !item.notes && { color: "rgba(255,255,255,0.25)" }]}>
-              {item.notes || "No notes yet — tap Edit to add some"}
-            </Text>
-          )}
-        </View>
-
-        {/* ── 4. Reminder ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Reminder</Text>
-            {editMode ? (
-              /* Edit mode: reminder state is editReminder */
-              editReminder && editReminder > Date.now() ? (
-                <>
-                  <View style={styles.reminderActiveBadge}>
-                    <Text style={styles.reminderActiveBadgeText}>Active</Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setEditReminder(undefined)}
-                    style={[styles.smallBtn, { borderColor: "rgba(239,68,68,0.30)" }]}
-                  >
-                    <Text style={[styles.smallBtnText, { color: "#EF4444" }]}>Remove</Text>
-                  </Pressable>
-                </>
-              ) : null
-            ) : (
-              /* View mode */
-              <>
-                {hasReminder && !editingReminder && (
-                  <View style={styles.reminderActiveBadge}>
-                    <Text style={styles.reminderActiveBadgeText}>Active</Text>
-                  </View>
-                )}
-                {hasReminder && !editingReminder && (
-                  <View style={{ flexDirection: "row", gap: 6 }}>
-                    <Pressable onPress={() => setEditingReminder(true)} style={styles.smallBtn}>
-                      <Text style={styles.smallBtnText}>Edit</Text>
-                    </Pressable>
-                    <Pressable onPress={handleClearReminder} style={[styles.smallBtn, { borderColor: "rgba(239,68,68,0.30)" }]}>
-                      <Text style={[styles.smallBtnText, { color: "#EF4444" }]}>Remove</Text>
-                    </Pressable>
-                  </View>
-                )}
-                {editingReminder && (
-                  <Pressable onPress={() => { setEditingReminder(false); setShowDatePicker(false); }} hitSlop={8}>
-                    <Feather name="x" size={16} color="rgba(255,255,255,0.35)" />
-                  </Pressable>
-                )}
-              </>
-            )}
-          </View>
-
-          {/* Edit mode reminder body */}
-          {editMode && (
-            <View style={{ gap: 8 }}>
-              {editReminder && editReminder > Date.now() && (
-                <Text style={styles.reminderText}>🔔 {formatReminder(editReminder)}</Text>
-              )}
-              <View style={styles.quickChips}>
-                {REMINDER_QUICK.map((opt) => (
-                  <Pressable
-                    key={opt.label}
-                    onPress={() => {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      setEditReminder(opt.getValue());
-                    }}
-                    style={styles.quickChip}
-                  >
-                    <Text style={styles.quickChipText}>{opt.label}</Text>
-                  </Pressable>
-                ))}
-                <Pressable
-                  onPress={() => setShowEditDatePicker(!showEditDatePicker)}
-                  style={[styles.quickChip, showEditDatePicker && styles.quickChipActive]}
-                >
-                  <Feather name="calendar" size={12} color={showEditDatePicker ? "#A5F3FC" : "rgba(255,255,255,0.45)"} />
-                  <Text style={[styles.quickChipText, showEditDatePicker && { color: "#A5F3FC" }]}>
-                    Custom date
-                  </Text>
-                </Pressable>
-                {(editReminder && editReminder > Date.now()) ? null : (
-                  <Pressable
-                    onPress={() => setEditReminder(undefined)}
-                    style={styles.quickChip}
-                  >
-                    <Text style={[styles.quickChipText, { color: "rgba(255,255,255,0.35)" }]}>None</Text>
-                  </Pressable>
-                )}
-              </View>
-              {showEditDatePicker && Platform.OS !== "web" && (
-                <DateTimePicker
-                  value={editReminder ? new Date(editReminder) : new Date(Date.now() + 86400000)}
-                  mode="date"
-                  minimumDate={new Date()}
-                  onChange={(_, date) => {
-                    if (date) {
-                      setEditReminder(date.getTime());
-                      setShowEditDatePicker(false);
-                    }
-                  }}
-                  themeVariant="dark"
-                />
-              )}
             </View>
-          )}
 
-          {/* View mode reminder body */}
-          {!editMode && hasReminder && !editingReminder && (
-            <Text style={styles.reminderText}>🔔 {formatReminder(item.reminder!)}</Text>
-          )}
-          {!editMode && !hasReminder && !editingReminder && (
-            <Pressable onPress={() => setEditingReminder(true)} style={styles.addReminderBtn}>
-              <Feather name="plus" size={14} color="#A5F3FC" />
-              <Text style={styles.addReminderText}>Add reminder</Text>
-            </Pressable>
-          )}
-          {!editMode && editingReminder && (
-            <View style={{ gap: 8 }}>
-              <View style={styles.quickChips}>
-                {REMINDER_QUICK.map((opt) => (
-                  <Pressable
-                    key={opt.label}
-                    onPress={() => handleSetReminder(opt.getValue())}
-                    style={styles.quickChip}
-                  >
-                    <Text style={styles.quickChipText}>{opt.label}</Text>
-                  </Pressable>
-                ))}
-                <Pressable
-                  onPress={() => setShowDatePicker(!showDatePicker)}
-                  style={[styles.quickChip, showDatePicker && styles.quickChipActive]}
-                >
-                  <Feather name="calendar" size={12} color={showDatePicker ? "#A5F3FC" : "rgba(255,255,255,0.45)"} />
-                  <Text style={[styles.quickChipText, showDatePicker && { color: "#A5F3FC" }]}>
-                    Custom date
-                  </Text>
-                </Pressable>
-              </View>
-              {showDatePicker && Platform.OS !== "web" && (
-                <DateTimePicker
-                  value={item.reminder ? new Date(item.reminder) : new Date(Date.now() + 86400000)}
-                  mode="date"
-                  minimumDate={new Date()}
-                  onChange={(_, date) => {
-                    if (date) handleSetReminder(date.getTime());
-                  }}
-                  themeVariant="dark"
-                />
-              )}
+            {draftReminder ? (
+              <Pressable onPress={() => setDraftReminder(undefined)}>
+                <Text style={styles.clearInline}>Clear reminder</Text>
+              </Pressable>
+            ) : null}
+
+            <View style={styles.editActions}>
+              <Pressable style={styles.cancelBtn} onPress={cancelEdit}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable style={styles.saveBtn} onPress={saveEdit}>
+                <Text style={styles.saveText}>Save changes</Text>
+              </Pressable>
             </View>
-          )}
-        </View>
-
-        {/* ── 5. Action buttons ── */}
-        {editMode ? (
-          <View style={styles.actionsRow}>
-            <Pressable onPress={handleCancelEdit} style={styles.editBtn}>
-              <Text style={styles.editBtnText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              onPress={handleSaveEdit}
-              style={[styles.openBtn, { flex: 1, opacity: editTitle.trim() ? 1 : 0.4 }]}
-            >
-              <LinearGradient
-                colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.openBtnGrad}
-              >
-                <Feather name="check" size={15} color="#fff" />
-                <Text style={styles.openBtnText}>Save changes</Text>
-              </LinearGradient>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.actionsRow}>
-            <Pressable onPress={handleEnterEdit} style={styles.editBtn}>
-              <Feather name="edit-2" size={14} color="rgba(255,255,255,0.75)" />
-              <Text style={styles.editBtnText}>Edit</Text>
-            </Pressable>
-            <Pressable onPress={handleOpenLink} style={[styles.openBtn, { flex: 1 }]}>
-              <LinearGradient
-                colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.openBtnGrad}
-              >
-                <Text style={styles.openBtnText}>Open source ↗</Text>
-              </LinearGradient>
-            </Pressable>
           </View>
         )}
 
-        {/* ── 5. AI Future area ── */}
-        <View style={styles.aiArea}>
-          <Text style={styles.aiLabel}>FUTURE AI AREA</Text>
-          <Text style={styles.aiText}>
-            In the future, this area will show smart summaries, ingredients, steps, address, or key points — depending on the content type.
+        <View style={styles.card}>
+          <Text style={styles.label}>ORIGINAL LINK</Text>
+          <Text style={styles.urlText} numberOfLines={2}>
+            {currentItem.url}
           </Text>
         </View>
+
+        <View style={styles.actions}>
+          <Pressable style={styles.deleteBtn} onPress={removeItem}>
+            <Feather name="trash-2" size={17} color="#fff" />
+            <Text style={styles.actionText}>Delete</Text>
+          </Pressable>
+
+          <Pressable style={styles.openBtn} onPress={openLink}>
+            <Feather name="external-link" size={17} color="#fff" />
+            <Text style={styles.actionText}>Open original</Text>
+          </Pressable>
+        </View>
       </ScrollView>
+
+      {showDatePicker && Platform.OS !== "web" ? (
+        <DateTimePicker
+          value={
+            showDatePicker === "edit" && draftReminder
+              ? new Date(draftReminder)
+              : currentItem.reminder
+                ? new Date(currentItem.reminder)
+                : new Date(Date.now() + 86400000)
+          }
+          mode="date"
+          minimumDate={new Date()}
+          themeVariant="dark"
+          onChange={(_, date) => {
+            const mode = showDatePicker;
+            setShowDatePicker(null);
+
+            if (!date) return;
+
+            if (mode === "edit") {
+              setDraftReminder(date.getTime());
+            } else {
+              updateItem(currentItem.id, { reminder: date.getTime() });
+            }
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  content: { gap: 12, paddingBottom: 20 },
 
-  heroCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: SURFACE,
+  content: {
+    paddingHorizontal: 20,
+    gap: 18,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  headerTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  imageWrap: {
+    height: 220,
     borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "#0B1020",
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 12,
-    gap: 10,
-    overflow: "hidden",
   },
-  thumb: {
-    height: 160,
-    borderRadius: 18,
-    overflow: "hidden",
+
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+
+  imageFallback: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    gap: 8,
   },
-  heroFallbackCenter: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  heroFallbackIconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
+  fallbackIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  heroFallbackDomain: {
+  fallbackPlatform: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  fallbackDomain: {
+    color: "rgba(255,255,255,0.65)",
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    letterSpacing: 0.3,
   },
-  heroCatPill: {
+
+  badgeLeft: {
     position: "absolute",
-    top: 10,
-    left: 10,
+    top: 14,
+    left: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
     backgroundColor: "rgba(0,0,0,0.38)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
   },
-  heroPillText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.90)",
-  },
-  heroSrcPill: {
+
+  badgeRight: {
     position: "absolute",
-    top: 10,
-    right: 10,
+    top: 14,
+    right: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
     backgroundColor: "rgba(0,0,0,0.38)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
   },
-  heroSrcText: {
-    fontSize: 11,
+
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: "#A5F3FC",
   },
-  playWrap: {
-    shadowColor: "#22D3EE",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
+
+  platformText: {
+    color: "#A78BFA",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
-  playRing: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "rgba(255,255,255,0.20)",
-    alignItems: "center",
-    justifyContent: "center",
+
+  playCircle: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "50%",
+    marginTop: -28,
+    width: 56,
+    height: 56,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.35)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    paddingHorizontal: 2,
-  },
-  itemTitle: {
-    fontSize: 18,
+  title: {
+    color: "#fff",
+    fontSize: 20,
+    lineHeight: 26,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.4,
-    lineHeight: 24,
-    color: "#FFFFFF",
-  },
-  savedDate: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.45)",
-    marginTop: 4,
-  },
-  menuBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    marginTop: 2,
-  },
-  menuDots: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.80)",
-  },
-  deleteRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.25)",
-    backgroundColor: "rgba(239,68,68,0.08)",
-  },
-  deleteText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "#EF4444",
   },
 
-  card: {
-    marginHorizontal: 16,
-    backgroundColor: CARD_BG,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 16,
-    gap: 10,
-    overflow: "hidden",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  cardLabel: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.1,
-  },
-  smallBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  smallBtnActive: {
-    backgroundColor: "#8B5CF6",
-    borderColor: "#8B5CF6",
-  },
-  smallBtnText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: "rgba(255,255,255,0.75)",
-  },
-
-  notesInput: {
-    backgroundColor: "rgba(0,0,0,0.20)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "#FFFFFF",
-    minHeight: 90,
-    lineHeight: 21,
-  },
-  notesText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 21,
-    color: "rgba(255,255,255,0.75)",
-  },
-
-  reminderActiveBadge: {
-    backgroundColor: "rgba(34,211,238,0.12)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  reminderActiveBadgeText: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: "#A5F3FC",
-    letterSpacing: 0.4,
-  },
-  reminderText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(165,243,252,0.85)",
-    lineHeight: 21,
-  },
-  addReminderBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(34,211,238,0.25)",
-    backgroundColor: "rgba(34,211,238,0.08)",
-    alignSelf: "flex-start",
-  },
-  addReminderText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "#A5F3FC",
-  },
-  quickChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  quickChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+  quickCard: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: BORDER,
-    gap: 5,
-  },
-  quickChipActive: {
-    backgroundColor: "rgba(34,211,238,0.10)",
-    borderColor: "rgba(34,211,238,0.30)",
-  },
-  quickChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.65)",
-  },
-
-  actionsRow: {
-    flexDirection: "row",
-    marginHorizontal: 16,
+    borderRadius: 18,
+    padding: 12,
     gap: 10,
   },
+
   editBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  editBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.85)",
-  },
-  titleInput: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.4,
-    color: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(139,92,246,0.55)",
-    paddingBottom: 4,
-    paddingTop: 0,
-  },
-  cardLabelUppercase: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: "rgba(255,255,255,0.40)",
-    letterSpacing: 1.0,
-  },
-  catChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    minHeight: 44,
     borderRadius: 14,
+    backgroundColor: "rgba(139,92,246,0.16)",
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  catChipText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.70)",
-  },
-  openBtn: {
-    borderRadius: 18,
-    overflow: "hidden",
-    shadowColor: "#22D3EE",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.30,
-    shadowRadius: 18,
-  },
-  openBtnGrad: {
+    borderColor: "rgba(139,92,246,0.32)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    gap: 6,
+    gap: 8,
   },
-  openBtnText: {
+
+  editBtnText: {
     color: "#fff",
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
 
-  aiArea: {
-    marginHorizontal: 16,
-    borderRadius: 18,
-    borderWidth: 1.5,
+  remindLabel: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    marginLeft: 2,
+  },
+
+  reminderRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  reminderBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(34,211,238,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.18)",
+  },
+
+  reminderBtnCustom: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(34,211,238,0.10)",
+    borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(165,243,252,0.25)",
-    backgroundColor: "rgba(34,211,238,0.05)",
+    borderColor: "rgba(165,243,252,0.34)",
+  },
+
+  reminderBtnActive: {
+    backgroundColor: "rgba(217,70,239,0.16)",
+    borderColor: "rgba(217,70,239,0.44)",
+  },
+
+  reminderText: {
+    color: "#A5F3FC",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+
+  reminderTextActive: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  card: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 18,
     padding: 16,
     gap: 8,
-    marginBottom: 8,
   },
-  aiLabel: {
-    fontSize: 9,
+
+  label: {
+    color: "rgba(255,255,255,0.42)",
+    fontSize: 11,
+    letterSpacing: 1,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1.8,
-    color: "rgba(165,243,252,0.70)",
   },
-  aiText: {
-    fontSize: 13,
+
+  text: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 14,
+    lineHeight: 21,
     fontFamily: "Inter_400Regular",
-    lineHeight: 20,
-    color: "rgba(165,243,252,0.75)",
+  },
+
+  reminderDate: {
+    color: "#A5F3FC",
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+  },
+
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  clearPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(34,211,238,0.10)",
+  },
+
+  clearPillText: {
+    color: "#A5F3FC",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  editPanel: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+
+  editTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  input: {
+    backgroundColor: "#0B1020",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  },
+
+  textArea: {
+    minHeight: 84,
+    backgroundColor: "#0B1020",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  },
+
+  categoryRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  categoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  categoryChipActive: {
+    backgroundColor: "rgba(217,70,239,0.12)",
+    borderColor: "rgba(217,70,239,0.38)",
+  },
+
+  categoryText: {
+    color: "rgba(255,255,255,0.60)",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+
+  categoryTextActive: {
+    color: "#fff",
+  },
+
+  clearInline: {
+    color: "#A5F3FC",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+
+  editActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
+
+  cancelBtn: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  saveBtn: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  cancelText: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+
+  saveText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  urlText: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: "Inter_400Regular",
+  },
+
+  actions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  deleteBtn: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: BORDER,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  openBtn: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: "#8B5CF6",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  actionText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  center: {
+    flex: 1,
+    backgroundColor: BG,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+  },
+
+  notFoundText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  backBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  backBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
   },
 });

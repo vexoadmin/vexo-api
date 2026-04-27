@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -39,6 +39,10 @@ const CATEGORY_ICONS = [
   "archive", "bell", "bookmark", "feather",
 ];
 
+function normalizeCategoryName(name: string) {
+  return name.trim().toLocaleLowerCase();
+}
+
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -49,6 +53,8 @@ export default function CategoriesScreen() {
   const [formName, setFormName] = useState("");
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedIcon, setSelectedIcon] = useState(0);
+  const listRef = useRef<FlatList<number> | null>(null);
+  const formInputRef = useRef<TextInput | null>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 84 + 34 : insets.bottom + 90;
@@ -56,10 +62,20 @@ export default function CategoriesScreen() {
   const categoryItemCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const item of items) {
-      counts[item.category] = (counts[item.category] || 0) + 1;
+      const key = normalizeCategoryName(item.category);
+      counts[key] = (counts[key] || 0) + 1;
     }
     return counts;
   }, [items]);
+
+  const scrollToFormAndFocus = useCallback(() => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      setTimeout(() => {
+        formInputRef.current?.focus();
+      }, 220);
+    });
+  }, []);
 
   function openAdd() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -68,6 +84,7 @@ export default function CategoriesScreen() {
     setSelectedIcon(0);
     setEditingId(null);
     setFormMode("add");
+    scrollToFormAndFocus();
   }
 
   function openEdit(id: string) {
@@ -80,6 +97,7 @@ export default function CategoriesScreen() {
     setSelectedIcon(iconIdx >= 0 ? iconIdx : 0);
     setEditingId(id);
     setFormMode("edit");
+    scrollToFormAndFocus();
   }
 
   function closeForm() {
@@ -89,10 +107,20 @@ export default function CategoriesScreen() {
   }
 
   function handleAdd() {
-    if (!formName.trim()) return;
+    const trimmedName = formName.trim();
+    if (!trimmedName) return;
+
+    const exists = categories.some(
+      (cat) => normalizeCategoryName(cat.name) === normalizeCategoryName(trimmedName)
+    );
+    if (exists) {
+      Alert.alert("Category already exists");
+      return;
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addCategory({
-      name: formName.trim(),
+      name: trimmedName,
       color: CATEGORY_COLORS[selectedColor],
       icon: CATEGORY_ICONS[selectedIcon],
     });
@@ -100,10 +128,22 @@ export default function CategoriesScreen() {
   }
 
   function handleSaveEdit() {
-    if (!formName.trim() || !editingId) return;
+    const trimmedName = formName.trim();
+    if (!trimmedName || !editingId) return;
+
+    const exists = categories.some(
+      (cat) =>
+        cat.id !== editingId &&
+        normalizeCategoryName(cat.name) === normalizeCategoryName(trimmedName)
+    );
+    if (exists) {
+      Alert.alert("Category already exists");
+      return;
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateCategory(editingId, {
-      name: formName.trim(),
+      name: trimmedName,
       color: CATEGORY_COLORS[selectedColor],
       icon: CATEGORY_ICONS[selectedIcon],
     });
@@ -113,7 +153,7 @@ export default function CategoriesScreen() {
   function handleDelete(id: string) {
     const cat = categories.find((c) => c.id === id);
     if (!cat) return;
-    const count = categoryItemCounts[cat.name] || 0;
+    const count = categoryItemCounts[normalizeCategoryName(cat.name)] || 0;
     Alert.alert(
       "Delete Category",
       count > 0
@@ -143,6 +183,7 @@ export default function CategoriesScreen() {
       <View style={styles.glowBottom} pointerEvents="none" />
 
       <FlatList
+        ref={listRef}
         data={[1]}
         keyExtractor={() => "content"}
         showsVerticalScrollIndicator={false}
@@ -188,6 +229,7 @@ export default function CategoriesScreen() {
                 </View>
 
                 <TextInput
+                  ref={formInputRef}
                   value={formName}
                   onChangeText={setFormName}
                   placeholder="Collection name..."
@@ -272,7 +314,9 @@ export default function CategoriesScreen() {
               <CategoryCard
                 key={category.id}
                 category={category}
-                itemCount={categoryItemCounts[category.name] || 0}
+                itemCount={
+                  categoryItemCounts[normalizeCategoryName(category.name)] || 0
+                }
                 onPress={() => router.push(`/category/${category.id}`)}
                 onEdit={() => openEdit(category.id)}
                 index={i}

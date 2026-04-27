@@ -1,114 +1,78 @@
-import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
-import { SymbolView } from "expo-symbols";
-import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useColors } from "@/hooks/useColors";
-
-function NativeTabLayout() {
+function TabIconText({ symbol, color }: { symbol: string; color: string }) {
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="categories">
-        <Icon sf={{ default: "folder", selected: "folder.fill" }} />
-        <Label>Categories</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="more">
-        <Icon sf={{ default: "ellipsis.circle", selected: "ellipsis.circle.fill" }} />
-        <Label>More</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Text
+      style={{
+        color,
+        fontSize: 25,
+        lineHeight: 25,
+        marginBottom: 1,
+      }}
+    >
+      {symbol}
+    </Text>
   );
 }
 
-function ClassicTabLayout() {
-  const colors = useColors();
-  const colorScheme = useColorScheme();
-  const isDark = true;
-  const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
+export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
+  const androidBottomSpace = Math.max(insets.bottom, 20);
+  const tabBarHeight =
+    Platform.OS === "android" ? 78 + androidBottomSpace : 76 + insets.bottom;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarActiveTintColor: "#8B5CF6",
+        tabBarInactiveTintColor: "rgba(255,255,255,0.55)",
         tabBarStyle: {
-          position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: isWeb ? 1 : 0,
-          borderTopColor: colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          backgroundColor: "#050814",
+          borderTopColor: "rgba(255,255,255,0.08)",
+          borderTopWidth: 1,
+          height: tabBarHeight,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === "android" ? androidBottomSpace : 10,
         },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={100}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-          ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
-          ) : null,
+        tabBarItemStyle: {
+          paddingTop: 2,
+        },
+        tabBarLabelStyle: {
+          fontSize: 13,
+          fontFamily: "Inter_500Medium",
+          marginTop: 0,
+          marginBottom: 0,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
-            ) : (
-              <Feather name="home" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => <TabIconText symbol="⌂" color={color} />,
         }}
       />
+
       <Tabs.Screen
         name="categories"
         options={{
           title: "Categories",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="folder" tintColor={color} size={24} />
-            ) : (
-              <Feather name="grid" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => <TabIconText symbol="▦" color={color} />,
         }}
       />
+
       <Tabs.Screen
         name="more"
         options={{
           title: "More",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="ellipsis.circle" tintColor={color} size={24} />
-            ) : (
-              <Feather name="more-horizontal" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => <TabIconText symbol="⋯" color={color} />,
         }}
       />
     </Tabs>
   );
-}
-
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
 }
