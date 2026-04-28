@@ -13,6 +13,7 @@ function extractFirstHttpUrl(text: string): string | undefined {
 }
 
 function mapIncomingToAddPath(rawPath: string): string {
+  console.log("[share] native intent input", rawPath);
   const decoded = decodePossiblyEncoded(rawPath).trim();
   const directFromLooseQuery = (() => {
     const match = decoded.match(/(?:[?&#]|^)(?:url|text)=([^&#]+)/i);
@@ -21,7 +22,10 @@ function mapIncomingToAddPath(rawPath: string): string {
     return extractFirstHttpUrl(normalized) || normalized;
   })();
   if (directFromLooseQuery) {
-    return `/add?url=${encodeURIComponent(directFromLooseQuery)}`;
+    const mapped = `/add?url=${encodeURIComponent(directFromLooseQuery)}`;
+    console.log("[share] extracted url", directFromLooseQuery);
+    console.log("[share] mapped path", mapped);
+    return mapped;
   }
   const directFromQuery = (() => {
     try {
@@ -35,12 +39,19 @@ function mapIncomingToAddPath(rawPath: string): string {
     }
   })();
   if (directFromQuery) {
-    return `/add?url=${encodeURIComponent(directFromQuery)}`;
+    const mapped = `/add?url=${encodeURIComponent(directFromQuery)}`;
+    console.log("[share] extracted url", directFromQuery);
+    console.log("[share] mapped path", mapped);
+    return mapped;
   }
   const directUrl = extractFirstHttpUrl(decoded);
   if (directUrl) {
-    return `/add?url=${encodeURIComponent(directUrl)}`;
+    const mapped = `/add?url=${encodeURIComponent(directUrl)}`;
+    console.log("[share] extracted url", directUrl);
+    console.log("[share] mapped path", mapped);
+    return mapped;
   }
+  console.log("[share] mapped path", rawPath);
   return rawPath;
 }
 

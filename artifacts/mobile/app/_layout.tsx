@@ -77,13 +77,8 @@ function RootLayoutNav() {
 
       let candidate: string | undefined;
       const trimmed = incoming.trim();
-      const isDeepLink = /^vexo:\/\//i.test(trimmed);
 
-      if (isDeepLink) {
-        console.log("DEEP_LINK_RECEIVED", trimmed);
-      } else {
-        console.log("SHARE_RECEIVED", trimmed);
-      }
+      console.log("[share] native intent input", trimmed);
 
       const fromVexoAdd = extractUrlFromVexoAddLink(trimmed);
       if (fromVexoAdd) {
@@ -100,7 +95,8 @@ function RootLayoutNav() {
       }
 
       if (!candidate) return;
-      console.log("EXTRACTED_URL", candidate);
+      console.log("[share] extracted url", candidate);
+      console.log("[share] route to add", `/add?url=${encodeURIComponent(candidate)}`);
 
       router.replace({
         pathname: "/add",
@@ -109,10 +105,14 @@ function RootLayoutNav() {
     };
 
     Linking.getInitialURL()
-      .then(routeToAddFromIncoming)
+      .then((initialUrl) => {
+        console.log("[share] layout initial url", initialUrl);
+        routeToAddFromIncoming(initialUrl);
+      })
       .catch(() => undefined);
 
     const sub = Linking.addEventListener("url", ({ url }) => {
+      console.log("[share] layout initial url", url);
       routeToAddFromIncoming(url);
     });
 
