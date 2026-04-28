@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { load } from "cheerio";
 
 type PlatformType =
   | "youtube"
@@ -11,6 +12,9 @@ type PlatformType =
 type MetadataResponse = {
   resolverVersion: "metadata-resolver-v2";
   title: string;
+  image?: string;
+  imageUrl?: string;
+  thumbnail?: string;
   thumbnailUrl?: string;
   description?: string;
   url: string;
@@ -456,17 +460,17 @@ async function resolveFinalUrl(url: string): Promise<string> {
 function fallbackTitle(platform: PlatformType, domain: string): string {
   switch (platform) {
     case "youtube":
-      return "Saved YouTube video";
+      return "YouTube video";
     case "tiktok":
-      return "Saved TikTok video";
+      return "TikTok video";
     case "instagram":
-      return "Saved Instagram post";
+      return "Instagram post";
     case "facebook":
-      return "Saved Facebook post";
+      return "Facebook post";
     case "pinterest":
-      return "Pinterest saved idea";
+      return "Pinterest pin";
     default:
-      return domain ? `Saved from ${domain}` : DEFAULT_TITLE;
+      return domain || DEFAULT_TITLE;
   }
 }
 
@@ -487,6 +491,156 @@ function sourceLabelForPlatform(platform: PlatformType, domain: string): string 
   }
 }
 
+function sanitizeFinalUrlForPlatform(url: string, platform: PlatformType, fallbackUrl: string): string {
+  if (platform === "youtube" && /google\.com\/sorry/i.test(url)) {
+    return fallbackUrl;
+  }
+  return url;
+}
+
+function extractHtmlMetadataWithCheerio(html: string, pageUrl: URL): {
+  ogTitle?: string;
+  twitterTitle?: string;
+  ogDescription?: string;
+  titleTag?: string;
+  jsonLdTitle?: string;
+  imageCandidates: string[];
+  htmlImageCandidates: string[];
+  selectedHtmlImage?: string;
+  favicon?: string;
+} {
+  const $ = load(html);
+
+  const ogTitle = $('meta[property="og:title"]').attr("content");
+  const twitterTitle = $('meta[name="twitter:title"]').attr("content");
+  const ogDescription = $('meta[property="og:description"]').attr("content");
+  const titleTag = $("title").first().text() || undefined;
+
+  let jsonLdTitle: string | undefined;
+  let jsonLdImage: string | undefined;
+  $('script[type="application/ld+json"]').each((_, el) => {
+    if (jsonLdTitle || jsonLdImage) return;
+    const raw = $(el).text()?.trim();
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      const queue = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of queue) {
+        if (!item || typeof item !== "object") continue;
+        const record = item as Record<string, unknown>;
+        if (!jsonLdTitle) {
+          const titleCandidate =
+            (typeof record["headline"] === "string" && record["headline"]) ||
+            (typeof record["name"] === "string" && record["name"]) ||
+            undefined;
+          jsonLdTitle = titleCandidate;
+        }
+        if (!jsonLdImage) {
+          const imageField = record["image"];
+          if (typeof imageField === "string") jsonLdImage = imageField;
+          else if (Array.isArray(imageField)) {
+            jsonLdImage = imageField.find((entry): entry is string => typeof entry === "string");
+          } else if (imageField && typeof imageField === "object") {
+            const imgObj = imageField as Record<string, unknown>;
+            if (typeof imgObj["url"] === "string") jsonLdImage = imgObj["url"];
+          }
+        }
+        if (jsonLdTitle && jsonLdImage) break;
+      }
+    } catch {
+      // ignore malformed JSON-LD
+    }
+  });
+
+  const imageCandidatesRaw = [
+    $('meta[property="og:image:secure_url"]').attr("content"),
+    $('meta[property="og:image"]').attr("content"),
+    $('meta[name="twitter:image"]').attr("content"),
+    $('meta[name="twitter:image:src"]').attr("content"),
+    $('link[rel="image_src"]').attr("href"),
+    jsonLdImage,
+  ].filter((value): value is string => Boolean(value && value.trim()));
+
+  const imageCandidates = imageCandidatesRaw
+    .map((candidate) => absoluteAssetUrl(pageUrl, candidate))
+    .filter((value): value is string => Boolean(value));
+
+  const pickFirstFromSrcSet = (srcSet?: string): string | undefined => {
+    if (!srcSet) return undefined;
+    const first = srcSet
+      .split(",")
+      .map((entry) => entry.trim().split(/\s+/)[0])
+      .find((entry) => Boolean(entry));
+    return first;
+  };
+
+  const isBadImageUrl = (value: string): boolean => {
+    const lower = value.toLowerCase();
+    if (lower.startsWith("data:")) return true;
+    if (lower.endsWith(".svg") || lower.includes(".svg?")) return true;
+    return /(favicon|icon|logo|sprite|placeholder|blank)/i.test(lower);
+  };
+
+  const htmlImgScored: Array<{ url: string; score: number }> = [];
+  $("img").each((_, el) => {
+    const src =
+      $(el).attr("src") ||
+      $(el).attr("data-src") ||
+      $(el).attr("data-lazy-src") ||
+      $(el).attr("data-original") ||
+      pickFirstFromSrcSet($(el).attr("srcset")) ||
+      pickFirstFromSrcSet($(el).attr("data-srcset"));
+    if (!src) return;
+
+    const absolute = absoluteAssetUrl(pageUrl, src);
+    if (!absolute || isBadImageUrl(absolute)) return;
+
+    const widthRaw = $(el).attr("width");
+    const heightRaw = $(el).attr("height");
+    const width = widthRaw ? Number.parseInt(widthRaw, 10) : NaN;
+    const height = heightRaw ? Number.parseInt(heightRaw, 10) : NaN;
+
+    if ((!Number.isNaN(width) && width < 120) || (!Number.isNaN(height) && height < 80)) {
+      return;
+    }
+
+    let score = 0;
+    if (!Number.isNaN(width) && width >= 300) score += 2;
+    if (!Number.isNaN(height) && height >= 180) score += 2;
+    if (/\.(jpe?g|png|webp)(\?|$)/i.test(absolute)) score += 2;
+    if (!Number.isNaN(width) && !Number.isNaN(height)) score += 1;
+    if (/cdn|image|media|upload/i.test(absolute)) score += 1;
+
+    htmlImgScored.push({ url: absolute, score });
+  });
+
+  const htmlImageCandidates = Array.from(
+    new Map(
+      htmlImgScored
+        .sort((a, b) => b.score - a.score)
+        .map((item) => [item.url, item.score]),
+    ).keys(),
+  );
+  const selectedHtmlImage = htmlImageCandidates[0];
+
+  const favicon =
+    absoluteAssetUrl(pageUrl, $('link[rel*="apple-touch-icon"]').attr("href")) ||
+    absoluteAssetUrl(pageUrl, $('link[rel*="icon"]').attr("href")) ||
+    undefined;
+
+  return {
+    ogTitle,
+    twitterTitle,
+    ogDescription,
+    titleTag: titleTag ? decodeHtmlEntities(titleTag) : undefined,
+    jsonLdTitle,
+    imageCandidates,
+    htmlImageCandidates,
+    selectedHtmlImage,
+    favicon,
+  };
+}
+
 function buildStableResponse(args: {
   title?: string;
   thumbnailUrl?: string;
@@ -501,10 +655,14 @@ function buildStableResponse(args: {
   const stableFallback = args.fallbackImageUrl || faviconForDomain(args.domain) || DEFAULT_FALLBACK_IMAGE;
   const hasRealPreviewImage = Boolean(args.hasRealPreviewImage && args.thumbnailUrl);
   const isFallback = args.isFallback ?? !hasRealPreviewImage;
+  const selectedPreviewImage = args.thumbnailUrl || stableFallback;
   return {
     resolverVersion: "metadata-resolver-v2",
     title: sanitizeTitle(args.title) || fallbackTitle(args.platform, args.domain),
-    thumbnailUrl: hasRealPreviewImage ? args.thumbnailUrl : undefined,
+    image: selectedPreviewImage,
+    imageUrl: selectedPreviewImage,
+    thumbnail: selectedPreviewImage,
+    thumbnailUrl: selectedPreviewImage,
     description: args.description,
     url: args.url,
     fallbackImageUrl: stableFallback,
@@ -658,6 +816,11 @@ export async function resolveMetadata(
     const microlinkOrYoutubeThumb =
       microlink.thumbnailUrl ||
       (microlinkYoutubeId ? youtubeThumbnail(microlinkYoutubeId) : undefined);
+    const safeMicrolinkUrl = sanitizeFinalUrlForPlatform(
+      microlinkResolved,
+      finalPlatform,
+      normalizedInputUrl,
+    );
     const payload = buildStableResponse({
       title:
         microlink.title ||
@@ -665,7 +828,7 @@ export async function resolveMetadata(
         (finalPlatform === "youtube" ? "YouTube video" : fallbackTitle(finalPlatform, finalDomain)),
       thumbnailUrl: microlinkOrYoutubeThumb,
       description: microlink.description,
-      url: microlinkResolved,
+      url: safeMicrolinkUrl,
       fallbackImageUrl: faviconForDomain(finalDomain),
       hasRealPreviewImage: Boolean(microlinkOrYoutubeThumb),
       isFallback: !microlinkOrYoutubeThumb,
@@ -693,6 +856,11 @@ export async function resolveMetadata(
       finalPlatform === "youtube" ? extractYoutubeId(microlinkResolved) : null;
     const ytThumb = youtubeId ? youtubeThumbnail(youtubeId) : undefined;
     const fallbackReason = "html_missing_after_microlink_empty";
+    const safeFallbackUrl = sanitizeFinalUrlForPlatform(
+      fetched.finalUrl || microlinkResolved,
+      finalPlatform,
+      normalizedInputUrl,
+    );
     const payload = buildStableResponse({
       platform: finalPlatform,
       domain: finalDomain,
@@ -700,7 +868,7 @@ export async function resolveMetadata(
         finalPlatform === "tiktok"
           ? "TikTok video"
           : fallbackTitle(finalPlatform, finalDomain),
-      url: fetched.finalUrl || microlinkResolved,
+      url: safeFallbackUrl,
       thumbnailUrl: ytThumb,
       fallbackImageUrl: ytThumb || faviconForDomain(finalDomain),
       hasRealPreviewImage: Boolean(ytThumb),
@@ -719,85 +887,71 @@ export async function resolveMetadata(
     return { payload, statusCode: 200, sourceUsed: "fallback", fallbackReason };
   }
 
-  const ogTitle = extractMetaContent(fetched.html, "og:title");
-  const ogImage =
-    extractMetaContent(fetched.html, "og:image:secure_url") ||
-    extractMetaContent(fetched.html, "og:image");
-  const ogDescription = extractMetaContent(fetched.html, "og:description");
-  const twitterTitle = extractMetaContent(fetched.html, "twitter:title");
-  const twitterImage =
-    extractMetaContent(fetched.html, "twitter:image") ||
-    extractMetaContent(fetched.html, "twitter:image:src");
-  const itempropImage = extractMetaContent(fetched.html, "image");
-  const imageSrc =
-    fetched.html.match(
-      /<link[^>]+rel=["'][^"']*image_src[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
-    )?.[1] ||
-    fetched.html.match(
-      /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*image_src[^"']*["'][^>]*>/i,
-    )?.[1];
-  const titleTag = extractTitleTag(fetched.html);
-  const jsonLd = extractJsonLdMetadata(fetched.html);
+  const htmlMeta = extractHtmlMetadataWithCheerio(fetched.html, finalParsed);
 
   logger?.info(
     {
-      extractedOgTitle: ogTitle,
-      extractedTwitterTitle: twitterTitle,
-      extractedJsonLdTitle: jsonLd.title,
-      extractedTitleTag: titleTag,
-      extractedOgImage: ogImage,
-      extractedTwitterImage: twitterImage,
-      extractedJsonLdImage: jsonLd.image,
-      extractedItempropImage: itempropImage,
-      extractedImageSrc: imageSrc,
+      extractedOgTitle: htmlMeta.ogTitle,
+      extractedTwitterTitle: htmlMeta.twitterTitle,
+      extractedJsonLdTitle: htmlMeta.jsonLdTitle,
+      extractedTitleTag: htmlMeta.titleTag,
+      imageCandidates: htmlMeta.imageCandidates,
+      htmlImgCandidatesCount: htmlMeta.htmlImageCandidates.length,
+      htmlImgCandidatesFirst10: htmlMeta.htmlImageCandidates.slice(0, 10),
+      selectedHtmlImg: htmlMeta.selectedHtmlImage,
     },
     "HTML_EXTRACTED_FIELDS",
   );
 
   const title =
     youtubeOEmbedTitle ||
-    sanitizeTitle(ogTitle) ||
-    sanitizeTitle(twitterTitle) ||
-    sanitizeTitle(jsonLd.title) ||
-    sanitizeTitle(titleTag) ||
+    sanitizeTitle(htmlMeta.ogTitle) ||
+    sanitizeTitle(htmlMeta.twitterTitle) ||
+    sanitizeTitle(htmlMeta.jsonLdTitle) ||
+    sanitizeTitle(htmlMeta.titleTag) ||
     (finalPlatform === "youtube" ? "YouTube video" : undefined) ||
     (finalPlatform === "tiktok" ? "TikTok video" : undefined) ||
     fallbackTitle(finalPlatform, finalDomain);
 
-  const realPreviewImage =
-    absoluteAssetUrl(finalParsed, ogImage) ||
-    absoluteAssetUrl(finalParsed, twitterImage) ||
-    absoluteAssetUrl(finalParsed, jsonLd.image) ||
-    absoluteAssetUrl(finalParsed, itempropImage) ||
-    absoluteAssetUrl(finalParsed, imageSrc) ||
-    (() => {
-      if (finalPlatform !== "youtube") return undefined;
-      const id = extractYoutubeId(fetched.finalUrl) || inputYoutubeId;
-      return id ? youtubeThumbnail(id) : undefined;
-    })();
-  const icon = extractFavicon(fetched.html, finalParsed);
+  const youtubeImage =
+    finalPlatform === "youtube"
+      ? (() => {
+          const id = extractYoutubeId(fetched.finalUrl) || inputYoutubeId;
+          return id ? youtubeThumbnail(id) : undefined;
+        })()
+      : undefined;
+  const realPreviewImage = htmlMeta.imageCandidates[0] || youtubeImage;
+  const realPreviewImageWithHtmlFallback = realPreviewImage || htmlMeta.selectedHtmlImage;
+  const icon = htmlMeta.favicon || extractFavicon(fetched.html, finalParsed);
   const fallbackImageUrl =
     icon || faviconForDomain(finalDomain) || screenshotFallback(fetched.finalUrl);
 
+  const finalUrl = sanitizeFinalUrlForPlatform(
+    fetched.finalUrl,
+    finalPlatform,
+    normalizedInputUrl,
+  );
+
   const payload = buildStableResponse({
     title,
-    thumbnailUrl: realPreviewImage,
-    description: sanitizeTitle(ogDescription),
-    url: fetched.finalUrl,
+    thumbnailUrl: realPreviewImageWithHtmlFallback,
+    description: sanitizeTitle(htmlMeta.ogDescription),
+    url: finalUrl,
     fallbackImageUrl,
-    hasRealPreviewImage: Boolean(realPreviewImage),
-    isFallback: !realPreviewImage,
+    hasRealPreviewImage: Boolean(realPreviewImageWithHtmlFallback),
+    isFallback: !realPreviewImageWithHtmlFallback,
     platform: finalPlatform,
     domain: finalDomain,
   });
 
-  const sourceUsed: "html" | "fallback" = realPreviewImage || title ? "html" : "fallback";
+  const sourceUsed: "html" | "fallback" =
+    realPreviewImageWithHtmlFallback || title ? "html" : "fallback";
   const fallbackReason = sourceUsed === "fallback" ? "html_extraction_empty" : undefined;
   logger?.info(
     {
       extractedTitle: title,
       extractedImageCandidate:
-        ogImage || twitterImage || jsonLd.image || itempropImage || imageSrc || inputYoutubeThumbnail,
+        htmlMeta.imageCandidates[0] || htmlMeta.selectedHtmlImage || inputYoutubeThumbnail,
       finalImageUrl: payload.thumbnailUrl || payload.fallbackImageUrl,
       isFallback: payload.isFallback,
       sourceUsed,
