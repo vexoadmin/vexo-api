@@ -298,7 +298,7 @@ async function fetchMicrolink(url: string): Promise<{
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const endpoint = `https://api.microlink.io/?url=${encodeURIComponent(
     url,
-  )}&screenshot=false&meta=false`;
+  )}&screenshot=false&meta=true`;
   try {
     const res = await fetch(endpoint, {
       method: "GET",
@@ -333,6 +333,47 @@ async function fetchMicrolink(url: string): Promise<{
       description:
         typeof data.description === "string" ? decodeHtmlEntities(data.description) : undefined,
       resolvedUrl: typeof data.url === "string" ? data.url : undefined,
+    };
+  } catch {
+    return {
+      called: true,
+      requestUrl: endpoint,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchYoutubeOEmbed(url: string): Promise<{
+  called: boolean;
+  requestUrl: string;
+  httpStatus?: number;
+  title?: string;
+}> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        accept: "application/json",
+      },
+    });
+    if (!res.ok) {
+      return {
+        called: true,
+        requestUrl: endpoint,
+        httpStatus: res.status,
+      };
+    }
+    const json = (await res.json()) as Record<string, unknown>;
+    return {
+      called: true,
+      requestUrl: endpoint,
+      httpStatus: res.status,
+      title: typeof json["title"] === "string" ? sanitizeTitle(json["title"]) : undefined,
     };
   } catch {
     return {
@@ -499,6 +540,8 @@ export async function resolveMetadata(
   const inputUrl = parsed.toString();
   const domain = extractDomain(parsed);
   const platform = detectPlatform(domain);
+  const inputYoutubeId = platform === "youtube" ? extractYoutubeId(inputUrl) : null;
+  const inputYoutubeThumbnail = inputYoutubeId ? youtubeThumbnail(inputYoutubeId) : undefined;
   logger?.info({ normalizedUrl: inputUrl, platformDetected: platform }, "REQUEST_NORMALIZED");
 
   const normalizedInputUrl =
@@ -509,6 +552,28 @@ export async function resolveMetadata(
       ? await resolveFinalUrl(inputUrl)
       : inputUrl;
   logger?.info({ normalizedUrl: normalizedInputUrl }, "REQUEST_RESOLVED_URL");
+  logger?.info(
+    {
+      inputUrl: rawUrl,
+      detectedPlatform: platform,
+    },
+    "METADATA_INPUT_PLATFORM",
+  );
+
+  let youtubeOEmbedTitle: string | undefined;
+  if (platform === "youtube") {
+    const youtubeOEmbed = await fetchYoutubeOEmbed(normalizedInputUrl);
+    youtubeOEmbedTitle = youtubeOEmbed.title;
+    logger?.info(
+      {
+        oEmbedCalled: youtubeOEmbed.called,
+        oEmbedRequestUrl: youtubeOEmbed.requestUrl,
+        oEmbedStatus: youtubeOEmbed.httpStatus,
+        oEmbedTitle: youtubeOEmbed.title,
+      },
+      "YOUTUBE_OEMBED_DEBUG",
+    );
+  }
 
   if (platform === "tiktok") {
     logger?.info(
@@ -586,19 +651,33 @@ export async function resolveMetadata(
   const finalPlatform = detectPlatform(finalDomain);
 
   if (microlink.title || microlink.thumbnailUrl) {
+    const microlinkYoutubeId =
+      finalPlatform === "youtube"
+        ? extractYoutubeId(microlinkResolved) || inputYoutubeId
+        : null;
+    const microlinkOrYoutubeThumb =
+      microlink.thumbnailUrl ||
+      (microlinkYoutubeId ? youtubeThumbnail(microlinkYoutubeId) : undefined);
     const payload = buildStableResponse({
-      title: microlink.title || fallbackTitle(finalPlatform, finalDomain),
-      thumbnailUrl: microlink.thumbnailUrl,
+      title:
+        microlink.title ||
+        youtubeOEmbedTitle ||
+        (finalPlatform === "youtube" ? "YouTube video" : fallbackTitle(finalPlatform, finalDomain)),
+      thumbnailUrl: microlinkOrYoutubeThumb,
       description: microlink.description,
       url: microlinkResolved,
       fallbackImageUrl: faviconForDomain(finalDomain),
-      hasRealPreviewImage: Boolean(microlink.thumbnailUrl),
-      isFallback: !microlink.thumbnailUrl,
+      hasRealPreviewImage: Boolean(microlinkOrYoutubeThumb),
+      isFallback: !microlinkOrYoutubeThumb,
       platform: finalPlatform,
       domain: finalDomain,
     });
     logger?.info(
       {
+        extractedTitle: microlink.title || youtubeOEmbedTitle,
+        extractedImageCandidate: microlink.thumbnailUrl || inputYoutubeThumbnail,
+        finalImageUrl: payload.thumbnailUrl || payload.fallbackImageUrl,
+        isFallback: payload.isFallback,
         sourceUsed: "microlink",
         title: payload.title,
         image: payload.thumbnailUrl || payload.fallbackImageUrl,
@@ -646,7 +725,17 @@ export async function resolveMetadata(
     extractMetaContent(fetched.html, "og:image");
   const ogDescription = extractMetaContent(fetched.html, "og:description");
   const twitterTitle = extractMetaContent(fetched.html, "twitter:title");
-  const twitterImage = extractMetaContent(fetched.html, "twitter:image");
+  const twitterImage =
+    extractMetaContent(fetched.html, "twitter:image") ||
+    extractMetaContent(fetched.html, "twitter:image:src");
+  const itempropImage = extractMetaContent(fetched.html, "image");
+  const imageSrc =
+    fetched.html.match(
+      /<link[^>]+rel=["'][^"']*image_src[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>/i,
+    )?.[1] ||
+    fetched.html.match(
+      /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*image_src[^"']*["'][^>]*>/i,
+    )?.[1];
   const titleTag = extractTitleTag(fetched.html);
   const jsonLd = extractJsonLdMetadata(fetched.html);
 
@@ -659,22 +748,33 @@ export async function resolveMetadata(
       extractedOgImage: ogImage,
       extractedTwitterImage: twitterImage,
       extractedJsonLdImage: jsonLd.image,
+      extractedItempropImage: itempropImage,
+      extractedImageSrc: imageSrc,
     },
     "HTML_EXTRACTED_FIELDS",
   );
 
   const title =
+    youtubeOEmbedTitle ||
     sanitizeTitle(ogTitle) ||
     sanitizeTitle(twitterTitle) ||
     sanitizeTitle(jsonLd.title) ||
     sanitizeTitle(titleTag) ||
+    (finalPlatform === "youtube" ? "YouTube video" : undefined) ||
     (finalPlatform === "tiktok" ? "TikTok video" : undefined) ||
     fallbackTitle(finalPlatform, finalDomain);
 
   const realPreviewImage =
     absoluteAssetUrl(finalParsed, ogImage) ||
     absoluteAssetUrl(finalParsed, twitterImage) ||
-    absoluteAssetUrl(finalParsed, jsonLd.image);
+    absoluteAssetUrl(finalParsed, jsonLd.image) ||
+    absoluteAssetUrl(finalParsed, itempropImage) ||
+    absoluteAssetUrl(finalParsed, imageSrc) ||
+    (() => {
+      if (finalPlatform !== "youtube") return undefined;
+      const id = extractYoutubeId(fetched.finalUrl) || inputYoutubeId;
+      return id ? youtubeThumbnail(id) : undefined;
+    })();
   const icon = extractFavicon(fetched.html, finalParsed);
   const fallbackImageUrl =
     icon || faviconForDomain(finalDomain) || screenshotFallback(fetched.finalUrl);
@@ -695,6 +795,11 @@ export async function resolveMetadata(
   const fallbackReason = sourceUsed === "fallback" ? "html_extraction_empty" : undefined;
   logger?.info(
     {
+      extractedTitle: title,
+      extractedImageCandidate:
+        ogImage || twitterImage || jsonLd.image || itempropImage || imageSrc || inputYoutubeThumbnail,
+      finalImageUrl: payload.thumbnailUrl || payload.fallbackImageUrl,
+      isFallback: payload.isFallback,
       sourceUsed,
       fallbackReason,
       title: payload.title,
