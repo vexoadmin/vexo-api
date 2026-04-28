@@ -14,6 +14,29 @@ function extractFirstHttpUrl(text: string): string | undefined {
 
 function mapIncomingToAddPath(rawPath: string): string {
   const decoded = decodePossiblyEncoded(rawPath).trim();
+  const directFromLooseQuery = (() => {
+    const match = decoded.match(/(?:[?&#]|^)(?:url|text)=([^&#]+)/i);
+    if (!match?.[1]) return undefined;
+    const normalized = decodePossiblyEncoded(match[1]).trim();
+    return extractFirstHttpUrl(normalized) || normalized;
+  })();
+  if (directFromLooseQuery) {
+    return `/add?url=${encodeURIComponent(directFromLooseQuery)}`;
+  }
+  const directFromQuery = (() => {
+    try {
+      const parsed = new URL(decoded.startsWith("vexo://") ? decoded : `vexo://${decoded.replace(/^\//, "")}`);
+      const queryUrl = parsed.searchParams.get("url") || parsed.searchParams.get("text");
+      if (!queryUrl) return undefined;
+      const normalized = decodePossiblyEncoded(queryUrl).trim();
+      return extractFirstHttpUrl(normalized) || normalized;
+    } catch {
+      return undefined;
+    }
+  })();
+  if (directFromQuery) {
+    return `/add?url=${encodeURIComponent(directFromQuery)}`;
+  }
   const directUrl = extractFirstHttpUrl(decoded);
   if (directUrl) {
     return `/add?url=${encodeURIComponent(directUrl)}`;

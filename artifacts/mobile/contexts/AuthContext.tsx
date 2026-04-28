@@ -423,6 +423,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
+        options: {
+          emailRedirectTo: "vexo://auth/confirmed",
+        },
       });
       if (error) {
         if (isDuplicateEmailError(error)) {

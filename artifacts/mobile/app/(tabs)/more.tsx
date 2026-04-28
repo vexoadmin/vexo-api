@@ -1,10 +1,12 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import React, { useRef } from "react";
 import {
+  Alert,
   Animated,
   Image,
   Platform,
@@ -222,6 +224,17 @@ export default function MoreScreen() {
     router.push(`/item/${id}`);
   }
 
+  // TODO: Remove this developer-only helper before release.
+  async function resetTutorialForCurrentUser() {
+    const key = `vexo_tutorial_seen:${profile?.id || "default"}`;
+    try {
+      await AsyncStorage.removeItem(key);
+      Alert.alert("Tutorial reset");
+    } catch {
+      Alert.alert("Tutorial reset failed");
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.glowTopLeft} pointerEvents="none" />
@@ -266,6 +279,28 @@ export default function MoreScreen() {
               </Text>
             </View>
           </View>
+
+          {mode === "authenticated" ? (
+            <ActionRow
+              icon="user"
+              label="Profile"
+              description="Manage your account settings"
+              iconColor="#8B5CF6"
+              onPress={() => {
+                router.push("/profile");
+              }}
+            />
+          ) : null}
+
+          <ActionRow
+            icon="refresh-cw"
+            label="Reset tutorial"
+            description="Developer-only: show onboarding again"
+            iconColor="#A5F3FC"
+            onPress={() => {
+              void resetTutorialForCurrentUser();
+            }}
+          />
 
           {mode === "authenticated" ? (
             <ActionRow

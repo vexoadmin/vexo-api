@@ -76,140 +76,13 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "9", name: "Tech", color: "#6366F1", icon: "cpu" },
 ];
 
-const tomorrow = Date.now() + 86400000;
-const nextWeek = Date.now() + 604800000;
-
-const SAMPLE_ITEMS: SavedItem[] = [
-  {
-    id: "s1",
-    url: "https://www.youtube.com/watch?v=3AKt1R1aDnU",
-    title: "5-minute Pasta Carbonara recipe",
-    platform: "youtube",
-    category: "Recipes",
-    notes: "Use pancetta not bacon",
-    thumbnailColor: "#F97316",
-    thumbnailUrl: "https://img.youtube.com/vi/3AKt1R1aDnU/hqdefault.jpg",
-    createdAt: Date.now() - 86400000,
-    reminder: tomorrow,
-  },
-  {
-    id: "s2",
-    url: "https://www.tiktok.com/@visitbali/video/7301234567890123456",
-    title: "Best Bali travel spots 2024",
-    platform: "tiktok",
-    category: "Travel",
-    notes: "Book rice terraces sunrise tour",
-    thumbnailColor: "#06B6D4",
-    thumbnailUrl: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=640&q=80",
-    createdAt: Date.now() - 172800000,
-  },
-  {
-    id: "s3",
-    url: "https://www.instagram.com/reel/C1234567890/",
-    title: "Morning yoga for kids — 10 mins",
-    platform: "instagram",
-    category: "Kids",
-    notes: "Perfect for school mornings",
-    thumbnailColor: "#EC4899",
-    thumbnailUrl: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=640&q=80",
-    createdAt: Date.now() - 259200000,
-    reminder: nextWeek,
-  },
-  {
-    id: "s4",
-    url: "https://www.youtube.com/watch?v=MkNeIUgNPQ8",
-    title: "How to learn anything 10x faster",
-    platform: "youtube",
-    category: "Learning",
-    notes: "The Feynman technique section is gold",
-    thumbnailColor: "#8B5CF6",
-    thumbnailUrl: "https://img.youtube.com/vi/MkNeIUgNPQ8/hqdefault.jpg",
-    createdAt: Date.now() - 345600000,
-  },
-  {
-    id: "s5",
-    url: "https://www.tiktok.com/@motivation/video/7312345678901234567",
-    title: "Daily habits of highly creative people",
-    platform: "tiktok",
-    category: "Inspiration",
-    notes: "Start a morning pages journal",
-    thumbnailColor: "#F59E0B",
-    thumbnailUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=640&q=80",
-    createdAt: Date.now() - 432000000,
-  },
-  {
-    id: "s6",
-    url: "https://www.youtube.com/watch?v=fKdDPIFkOoQ",
-    title: "iPhone photography tips that actually work",
-    platform: "youtube",
-    category: "Tips",
-    notes: "Grid lines + rule of thirds",
-    thumbnailColor: "#10B981",
-    thumbnailUrl: "https://img.youtube.com/vi/fKdDPIFkOoQ/hqdefault.jpg",
-    createdAt: Date.now() - 518400000,
-  },
-  {
-    id: "s7",
-    url: "https://www.instagram.com/reel/C7654321098/",
-    title: "Lo-fi beats playlist — 3 hours",
-    platform: "instagram",
-    category: "Music",
-    notes: "Good for focus sessions",
-    thumbnailColor: "#3B82F6",
-    thumbnailUrl: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=640&q=80",
-    createdAt: Date.now() - 604800000,
-  },
-  {
-    id: "s8",
-    url: "https://www.tiktok.com/@codewithme/video/7323456789012345678",
-    title: "10 VS Code tricks you didn't know",
-    platform: "tiktok",
-    category: "Tech",
-    notes: "Multi-cursor selection blew my mind",
-    thumbnailColor: "#6366F1",
-    thumbnailUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=640&q=80",
-    createdAt: Date.now() - 691200000,
-  },
-  {
-    id: "s9",
-    url: "https://www.youtube.com/watch?v=CBpFpsksEto",
-    title: "30-day fitness challenge — Week 1",
-    platform: "youtube",
-    category: "Fitness",
-    notes: "No equipment needed",
-    thumbnailColor: "#EF4444",
-    thumbnailUrl: "https://img.youtube.com/vi/CBpFpsksEto/hqdefault.jpg",
-    createdAt: Date.now() - 777600000,
-  },
-  {
-    id: "s10",
-    url: "https://www.instagram.com/reel/C9876543210/",
-    title: "Sourdough bread recipe — beginner friendly",
-    platform: "instagram",
-    category: "Recipes",
-    notes: "72 hour cold ferment version",
-    thumbnailColor: "#F97316",
-    thumbnailUrl: "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=640&q=80",
-    createdAt: Date.now() - 864000000,
-  },
-];
+const SAMPLE_ITEMS: SavedItem[] = [];
 
 /**
  * For users who already have the old sample items stored in AsyncStorage
  * (no thumbnailUrl), patch them with the correct URLs without wiping their data.
  */
-const SAMPLE_THUMBNAIL_MAP: Record<string, string> = {
-  s1: "https://img.youtube.com/vi/3AKt1R1aDnU/hqdefault.jpg",
-  s2: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=640&q=80",
-  s3: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=640&q=80",
-  s4: "https://img.youtube.com/vi/MkNeIUgNPQ8/hqdefault.jpg",
-  s5: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=640&q=80",
-  s6: "https://img.youtube.com/vi/fKdDPIFkOoQ/hqdefault.jpg",
-  s7: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=640&q=80",
-  s8: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=640&q=80",
-  s9: "https://img.youtube.com/vi/CBpFpsksEto/hqdefault.jpg",
-  s10: "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=640&q=80",
-};
+const SAMPLE_THUMBNAIL_MAP: Record<string, string> = {};
 
 function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -247,7 +120,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         AsyncStorage.getItem(ITEMS_KEY),
         AsyncStorage.getItem(CATEGORIES_KEY),
       ]);
-      const loadedItems: SavedItem[] = storedItems ? JSON.parse(storedItems) : SAMPLE_ITEMS;
+      const loadedItems: SavedItem[] = storedItems ? JSON.parse(storedItems) : [];
       const parsedCategories: Category[] = storedCategories
         ? JSON.parse(storedCategories)
         : DEFAULT_CATEGORIES;
@@ -257,9 +130,9 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
       /* Repair missing thumbnails in the background — never blocks the UI */
       repairMissingThumbnails(loadedItems);
     } catch {
-      setItems(SAMPLE_ITEMS);
+      setItems([]);
       setCategories(DEFAULT_CATEGORIES);
-      repairMissingThumbnails(SAMPLE_ITEMS);
+      repairMissingThumbnails([]);
     }
     if (mountedRef.current) setLoaded(true);
   }
@@ -284,7 +157,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         supabase
           .from("saved_items")
           .select(
-            "id,url,title,thumbnail_url,reminder_date,created_at,category_id,categories(name)",
+            "id,user_id,url,title,thumbnail_url,reminder_date,created_at,category_id,categories(name)",
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: false }),
@@ -306,23 +179,25 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
       const categoryNameById = new Map(remoteCategories.map((c) => [c.id, c.name]));
 
-      const remoteItems: SavedItem[] = (itemRes.data || []).map((item: any) => ({
-        id: item.id,
-        url: item.url,
-        title: item.title || item.url || "Saved link",
-        platform: "website",
-        category:
-          item.categories?.name ||
-          categoryNameById.get(item.category_id) ||
-          "Uncategorized",
-        notes: "",
-        thumbnailColor: "#8B5CF6",
-        thumbnailUrl: item.thumbnail_url || undefined,
-        createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
-        reminder: item.reminder_date
-          ? new Date(item.reminder_date).getTime()
-          : undefined,
-      }));
+      const remoteItems: SavedItem[] = (itemRes.data || [])
+        .filter((item: any) => item.user_id === userId)
+        .map((item: any) => ({
+          id: item.id,
+          url: item.url,
+          title: item.title || item.url || "Saved link",
+          platform: "website",
+          category:
+            item.categories?.name ||
+            categoryNameById.get(item.category_id) ||
+            "Uncategorized",
+          notes: "",
+          thumbnailColor: "#8B5CF6",
+          thumbnailUrl: item.thumbnail_url || undefined,
+          createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+          reminder: item.reminder_date
+            ? new Date(item.reminder_date).getTime()
+            : undefined,
+        }));
 
       if (mountedRef.current) {
         console.log("SavedItems loadRemoteData mapped items:", remoteItems.slice(0, 5));
@@ -333,8 +208,12 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         setLoaded(true);
       }
     } catch {
-      // Fallback to local if Supabase fails, to keep beta stable.
-      await loadLocalData();
+      // In authenticated mode, never fall back to potentially stale local user data.
+      if (mountedRef.current) {
+        setItems([]);
+        setCategories(DEFAULT_CATEGORIES);
+        setLoaded(true);
+      }
     }
   }
 
@@ -485,11 +364,11 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   const deleteItem = useCallback(
     (id: string) => {
       setItems((prev) => prev.filter((i) => i.id !== id));
-      if (isRemoteMode) {
-        void supabase.from("saved_items").delete().eq("id", id);
+      if (isRemoteMode && profile?.id) {
+        void supabase.from("saved_items").delete().eq("id", id).eq("user_id", profile.id);
       }
     },
-    [isRemoteMode],
+    [isRemoteMode, profile?.id],
   );
 
   const updateItem = useCallback(
@@ -515,7 +394,11 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
             payload["category_id"] = categoryId ?? null;
           }
           if (Object.keys(payload).length > 0) {
-            await supabase.from("saved_items").update(payload).eq("id", id);
+            await supabase
+              .from("saved_items")
+              .update(payload)
+              .eq("id", id)
+              .eq("user_id", profile.id);
           }
         })();
       }
@@ -589,8 +472,12 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
               item.category === oldName ? { ...item, category: newName } : item
             )
           );
-          if (isRemoteMode) {
-            void supabase.from("categories").update({ name: newName }).eq("id", id);
+          if (isRemoteMode && profile?.id) {
+            void supabase
+              .from("categories")
+              .update({ name: newName })
+              .eq("id", id)
+              .eq("user_id", profile.id);
           }
         }
 
@@ -605,17 +492,17 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         );
       });
     },
-    [isRemoteMode]
+    [isRemoteMode, profile?.id]
   );
 
   const deleteCategory = useCallback(
     (id: string) => {
       setCategories((prev) => prev.filter((c) => c.id !== id));
-      if (isRemoteMode) {
-        void supabase.from("categories").delete().eq("id", id);
+      if (isRemoteMode && profile?.id) {
+        void supabase.from("categories").delete().eq("id", id).eq("user_id", profile.id);
       }
     },
-    [isRemoteMode],
+    [isRemoteMode, profile?.id],
   );
 
   const searchItems = useCallback(

@@ -17,6 +17,10 @@
       "supportsTablet": false
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/vexo-app-icon.png",
+        "backgroundColor": "#0B0F1A"
+      },
       "intentFilters": [
         {
           "action": "SEND",
@@ -60,6 +64,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bcd4b9dc-26e7-41c5-888f-fd9a7a3f1f4b"
+      }
     }
   }
 }

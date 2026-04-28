@@ -33,7 +33,9 @@ export function AuthScreenContent({
     isAuthenticating,
   } =
     useAuth();
-  const [step, setStep] = useState<"welcome" | "signup" | "signin" | "resetPassword">("welcome");
+  const [step, setStep] = useState<
+    "welcome" | "signup" | "signin" | "resetPassword" | "emailConfirmed"
+  >("welcome");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -41,10 +43,19 @@ export function AuthScreenContent({
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    const maybeOpenResetPassword = (url: string | null) => {
+    const handleAuthDeepLink = (url: string | null) => {
       if (!url) return;
-      if (url.toLowerCase().startsWith("vexo://auth/reset-password")) {
+      const lower = url.toLowerCase();
+      if (lower.startsWith("vexo://auth/reset-password")) {
         setStep("resetPassword");
+        setPassword("");
+        setConfirmPassword("");
+        setErrorMessage("");
+        setSuccessMessage("");
+        return;
+      }
+      if (lower.startsWith("vexo://auth/confirmed")) {
+        setStep("emailConfirmed");
         setPassword("");
         setConfirmPassword("");
         setErrorMessage("");
@@ -53,11 +64,11 @@ export function AuthScreenContent({
     };
 
     void Linking.getInitialURL().then((url) => {
-      maybeOpenResetPassword(url);
+      handleAuthDeepLink(url);
     });
 
     const sub = Linking.addEventListener("url", ({ url }) => {
-      maybeOpenResetPassword(url);
+      handleAuthDeepLink(url);
     });
 
     return () => {
@@ -347,6 +358,39 @@ export function AuthScreenContent({
     );
   }
 
+  function renderEmailConfirmed() {
+    return (
+      <>
+        <View style={styles.confirmedWrap}>
+          <Feather name="check-circle" size={34} color="#34D399" />
+          <Text style={styles.confirmedTitle}>Email confirmed</Text>
+          <Text style={styles.confirmedSub}>You can now sign in to Vexo Save</Text>
+        </View>
+        <Pressable
+          onPress={() => {
+            setStep("signin");
+            setErrorMessage("");
+            setSuccessMessage("");
+          }}
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            pressed && !isAuthenticating ? { opacity: 0.9 } : null,
+          ]}
+        >
+          <LinearGradient
+            colors={["#D946EF", "#8B5CF6", "#22D3EE"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.primaryBtnInner}
+          >
+            <Feather name="log-in" size={17} color="#fff" />
+            <Text style={styles.primaryBtnText}>Go to sign in</Text>
+          </LinearGradient>
+        </Pressable>
+      </>
+    );
+  }
+
   return (
     <LinearGradient
       colors={["#060814", "#0A1022", "#121630"]}
@@ -376,6 +420,7 @@ export function AuthScreenContent({
           {step === "signup" && renderEmailForm("signup")}
           {step === "signin" && renderEmailForm("signin")}
           {step === "resetPassword" && renderResetPasswordForm()}
+          {step === "emailConfirmed" && renderEmailConfirmed()}
         </View>
 
         {!!successMessage && <Text style={styles.successText}>{successMessage}</Text>}
@@ -524,5 +569,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     textAlign: "center",
     marginTop: 12,
+  },
+  confirmedWrap: {
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  confirmedTitle: {
+    color: "#FFFFFF",
+    fontSize: 21,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  confirmedSub: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
   },
 });

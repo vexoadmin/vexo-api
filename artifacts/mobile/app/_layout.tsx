@@ -33,26 +33,79 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!isHydrated || mode === null) return;
 
+    const decodePossiblyEncoded = (value: string): string => {
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return value;
+      }
+    };
+
     const extractFirstHttpUrl = (text: string): string | undefined => {
       const match = text.match(/https?:\/\/[^\s<>"')\]}]+/i);
       if (!match?.[0]) return undefined;
       return match[0].replace(/[),.;!?]+$/, "");
     };
 
+    const extractQueryParamUrl = (text: string): string | undefined => {
+      const decoded = decodePossiblyEncoded(text);
+      const match = decoded.match(/(?:[?&#]|^)(?:url|text)=([^&#]+)/i);
+      if (!match?.[1]) return undefined;
+      const normalized = decodePossiblyEncoded(match[1]).trim();
+      return extractFirstHttpUrl(normalized) || normalized;
+    };
+
+    const extractUrlFromVexoAddLink = (incoming: string): string | undefined => {
+      try {
+        const parsed = new URL(incoming);
+        const queryUrl = parsed.searchParams.get("url") || parsed.searchParams.get("text");
+        if (queryUrl) {
+          const decoded = decodePossiblyEncoded(queryUrl).trim();
+          return extractFirstHttpUrl(decoded) || decoded;
+        }
+
+        if (parsed.protocol !== "vexo:" || parsed.hostname !== "add") return undefined;
+        const fromPath = decodePossiblyEncoded(parsed.pathname || "").trim();
+        return extractFirstHttpUrl(fromPath) || undefined;
+      } catch {
+        return undefined;
+      }
+    };
+
     const routeToAddFromIncoming = (incoming: string | null) => {
-      if (!incoming || pathname === "/add") return;
+      if (!incoming) return;
 
       let candidate: string | undefined;
       const trimmed = incoming.trim();
-      if (/^vexo:\/\/add/i.test(trimmed)) return;
-      if (/^https?:\/\//i.test(trimmed)) {
+      const isDeepLink = /^vexo:\/\//i.test(trimmed);
+
+      if (isDeepLink) {
+        console.log("DEEP_LINK_RECEIVED", trimmed);
+      } else {
+        console.log("SHARE_RECEIVED", trimmed);
+      }
+
+      const fromVexoAdd = extractUrlFromVexoAddLink(trimmed);
+      if (fromVexoAdd) {
+        candidate = fromVexoAdd;
+      } else {
+        candidate = extractQueryParamUrl(trimmed);
+      }
+      if (candidate) {
+        // use candidate from query-like payloads
+      } else if (/^https?:\/\//i.test(trimmed)) {
         candidate = trimmed;
       } else {
         candidate = extractFirstHttpUrl(trimmed);
       }
 
       if (!candidate) return;
-      router.push(`/add?url=${encodeURIComponent(candidate)}`);
+      console.log("EXTRACTED_URL", candidate);
+
+      router.replace({
+        pathname: "/add",
+        params: { url: candidate },
+      });
     };
 
     Linking.getInitialURL()
@@ -98,6 +151,12 @@ function RootLayoutNav() {
         name="category/[id]"
         options={{
           title: "Category",
+        }}
+      />
+      <Stack.Screen
+        name="profile"
+        options={{
+          title: "Profile",
         }}
       />
     </Stack>
