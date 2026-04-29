@@ -23,17 +23,6 @@
       },
       "intentFilters": [
         {
-          "action": "SEND",
-          "data": [
-            {
-              "mimeType": "text/plain"
-            }
-          ],
-          "category": [
-            "DEFAULT"
-          ]
-        },
-        {
           "action": "VIEW",
           "data": [
             {
@@ -56,6 +45,19 @@
         "expo-router",
         {
           "origin": "https://replit.com/"
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsText": true,
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1
+          },
+          "androidIntentFilters": [
+            "text/*"
+          ]
         }
       ],
       "expo-font",

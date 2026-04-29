@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 
 import {
   extractYoutubeId,
@@ -77,6 +78,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 const SAMPLE_ITEMS: SavedItem[] = [];
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * For users who already have the old sample items stored in AsyncStorage
@@ -88,13 +91,18 @@ function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
+function isUuid(value: string | null | undefined): value is string {
+  return !!value && UUID_REGEX.test(value);
+}
+
 export function SavedItemsProvider({ children }: { children: React.ReactNode }) {
-  const { mode, profile, isHydrated: authHydrated } = useAuth();
+  const { mode, user, profile, isHydrated: authHydrated } = useAuth();
   const [items, setItems] = useState<SavedItem[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [loaded, setLoaded] = useState(false);
   const mountedRef = useRef(true);
-  const isRemoteMode = mode === "authenticated" && !!profile?.id;
+  const authUserId = user?.id ?? null;
+  const isRemoteMode = mode === "authenticated" && !!authUserId;
 
   useEffect(() => {
     return () => {
@@ -148,6 +156,8 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
   async function loadRemoteData(userId: string) {
     try {
+      console.log("[LOAD] auth user id:", userId);
+      console.log("[LOAD DEBUG] user_id used:", userId);
       const [catRes, itemRes] = await Promise.all([
         supabase
           .from("categories")
@@ -163,8 +173,16 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
           .order("created_at", { ascending: false }),
       ]);
 
-      if (catRes.error || itemRes.error) {
-        throw new Error(catRes.error?.message || itemRes.error?.message);
+      console.log("[LOAD] saved_items query error:", itemRes.error);
+      console.log("[LOAD ERROR] saved_items error:", itemRes.error);
+      console.log("[LOAD] saved_items raw count:", itemRes.data?.length ?? 0);
+      console.log("[LOAD] saved_items raw rows:", itemRes.data ?? []);
+
+      if (itemRes.error) {
+        throw new Error(itemRes.error.message);
+      }
+      if (catRes.error) {
+        console.warn("SavedItems categories load failed:", catRes.error.message);
       }
 
       const remoteCategories: Category[] = (catRes.data || []).map((cat) => {
@@ -180,7 +198,6 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
       const categoryNameById = new Map(remoteCategories.map((c) => [c.id, c.name]));
 
       const remoteItems: SavedItem[] = (itemRes.data || [])
-        .filter((item: any) => item.user_id === userId)
         .map((item: any) => ({
           id: item.id,
           url: item.url,
@@ -198,6 +215,8 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
             ? new Date(item.reminder_date).getTime()
             : undefined,
         }));
+      console.log("[LOAD] mapped items count:", remoteItems.length);
+      console.log("[LOAD] final state items count before setItems:", remoteItems.length);
 
       if (mountedRef.current) {
         console.log("SavedItems loadRemoteData mapped items:", remoteItems.slice(0, 5));
@@ -207,7 +226,8 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         setItems(remoteItems);
         setLoaded(true);
       }
-    } catch {
+    } catch (error) {
+      console.log("[LOAD] saved_items query error:", error);
       // In authenticated mode, never fall back to potentially stale local user data.
       if (mountedRef.current) {
         setItems([]);
@@ -220,12 +240,12 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!authHydrated) return;
     setLoaded(false);
-    if (isRemoteMode && profile?.id) {
-      void loadRemoteData(profile.id);
+    if (isRemoteMode && authUserId) {
+      void loadRemoteData(authUserId);
     } else {
       void loadLocalData();
     }
-  }, [authHydrated, isRemoteMode, profile?.id]);
+  }, [authHydrated, isRemoteMode, authUserId]);
 
   function categoryIdByName(name: string): string | undefined {
     const normalized = normalizeCategoryName(name);
@@ -236,7 +256,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
     const existing = categories.find(
       (c) => normalizeCategoryName(c.name) === normalizeCategoryName(name),
     );
-    if (existing) return existing.id;
+    if (existing && isUuid(existing.id)) return existing.id;
 
     const { data, error } = await supabase
       .from("categories")
@@ -317,64 +337,89 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
       const optimisticItem = { ...item, id: optimisticId, createdAt: Date.now() };
       setItems((prev) => [optimisticItem, ...prev]);
 
-      if (isRemoteMode && profile?.id) {
+      if (isRemoteMode && authUserId) {
         void (async () => {
-          const categoryId = (await upsertRemoteCategory(profile.id, item.category)) ||
-            categoryIdByName(item.category);
-          const insertPayload = {
-            user_id: profile.id,
-            url: item.url,
-            title: item.title,
-            thumbnail_url: item.thumbnailUrl ?? null,
-            category_id: categoryId ?? null,
-            reminder_date: item.reminder ? new Date(item.reminder).toISOString() : null,
-          };
-          console.log("SavedItems Supabase insert payload:", insertPayload);
-          const { data, error } = await supabase
-            .from("saved_items")
-            .insert(insertPayload)
-            .select("id,created_at,title,thumbnail_url,url")
-            .single();
-          console.log("SavedItems Supabase insert result:", { data, error });
+          try {
+            if (!user?.id) {
+              throw new Error("Authenticated user is missing. Cannot save item.");
+            }
+            const categoryId = (await upsertRemoteCategory(authUserId, item.category)) ||
+              categoryIdByName(item.category);
+            const normalizedCategoryId = isUuid(categoryId) ? categoryId : null;
+            const insertPayload = {
+              user_id: user.id,
+              url: item.url,
+              title: item.title,
+              thumbnail_url: item.thumbnailUrl ?? null,
+              category_id: normalizedCategoryId,
+              reminder_date: item.reminder ? new Date(item.reminder).toISOString() : null,
+            };
+            console.log("[SAVE DEBUG] profile.id:", profile?.id);
+            console.log("[SAVE DEBUG] auth user id:", user?.id);
+            console.log("[SAVE] user_id being sent:", insertPayload.user_id);
+            console.log("[SAVE FIXED] user_id:", user.id);
+            console.log("SavedItems Supabase insert payload:", insertPayload);
+            const { data, error } = await supabase
+              .from("saved_items")
+              .insert(insertPayload)
+              .select(
+                "id,user_id,url,title,thumbnail_url,category_id,reminder_date,created_at",
+              )
+              .single();
+            console.log("SavedItems Supabase insert result:", { data, error });
 
-          if (data && mountedRef.current && !error) {
-            setItems((prev) =>
-              prev.map((saved) =>
-                saved.id === optimisticId
-                  ? {
-                      ...saved,
-                      id: data.id,
-                      url: data.url ?? saved.url,
-                      title: data.title ?? saved.title,
-                      thumbnailUrl: data.thumbnail_url ?? saved.thumbnailUrl,
-                      createdAt: new Date(data.created_at).getTime(),
-                    }
-                  : saved,
-              ),
-            );
+            if (error || !data) {
+              throw new Error(error?.message || "Save failed. No row was returned.");
+            }
+
+            if (mountedRef.current) {
+              setItems((prev) =>
+                prev.map((saved) =>
+                  saved.id === optimisticId
+                    ? {
+                        ...saved,
+                        id: data.id,
+                        url: data.url ?? saved.url,
+                        title: data.title ?? saved.title,
+                        thumbnailUrl: data.thumbnail_url ?? saved.thumbnailUrl,
+                        createdAt: new Date(data.created_at).getTime(),
+                      }
+                    : saved,
+                ),
+              );
+            }
+          } catch (err) {
+            console.error("SavedItems Supabase insert failed:", err);
+            if (mountedRef.current) {
+              setItems((prev) => prev.filter((saved) => saved.id !== optimisticId));
+              Alert.alert(
+                "Could not save item",
+                err instanceof Error ? err.message : "Unknown error while saving item.",
+              );
+            }
           }
         })();
       } else {
         console.log("SavedItems local save result:", optimisticItem);
       }
     },
-    [isRemoteMode, profile?.id, categories],
+    [isRemoteMode, authUserId, user?.id, profile?.id, categories],
   );
 
   const deleteItem = useCallback(
     (id: string) => {
       setItems((prev) => prev.filter((i) => i.id !== id));
-      if (isRemoteMode && profile?.id) {
-        void supabase.from("saved_items").delete().eq("id", id).eq("user_id", profile.id);
+      if (isRemoteMode && authUserId) {
+        void supabase.from("saved_items").delete().eq("id", id).eq("user_id", authUserId);
       }
     },
-    [isRemoteMode, profile?.id],
+    [isRemoteMode, authUserId],
   );
 
   const updateItem = useCallback(
     (id: string, updates: Partial<SavedItem>) => {
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
-      if (isRemoteMode && profile?.id) {
+      if (isRemoteMode && authUserId) {
         void (async () => {
           const payload: Record<string, unknown> = {};
           if (typeof updates.url === "string") payload["url"] = updates.url;
@@ -389,21 +434,21 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
           }
           if (typeof updates.category === "string") {
             const categoryId =
-              (await upsertRemoteCategory(profile.id, updates.category)) ||
+              (await upsertRemoteCategory(authUserId, updates.category)) ||
               categoryIdByName(updates.category);
-            payload["category_id"] = categoryId ?? null;
+            payload["category_id"] = isUuid(categoryId) ? categoryId : null;
           }
           if (Object.keys(payload).length > 0) {
             await supabase
               .from("saved_items")
               .update(payload)
               .eq("id", id)
-              .eq("user_id", profile.id);
+              .eq("user_id", authUserId);
           }
         })();
       }
     },
-    [isRemoteMode, profile?.id, categories],
+    [isRemoteMode, authUserId, categories],
   );
 
   const addCategory = useCallback(
@@ -421,11 +466,11 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         return [...prev, { ...category, name: trimmedName, id: newLocalId }];
       });
 
-      if (isRemoteMode && profile?.id) {
+      if (isRemoteMode && authUserId) {
         void (async () => {
           const { data } = await supabase
             .from("categories")
-            .insert({ user_id: profile.id, name: trimmedName })
+            .insert({ user_id: authUserId, name: trimmedName })
             .select("id")
             .single();
           if (data && mountedRef.current) {
@@ -436,7 +481,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         })();
       }
     },
-    [isRemoteMode, profile?.id],
+    [isRemoteMode, authUserId],
   );
 
   const updateCategory = useCallback(
@@ -472,12 +517,12 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
               item.category === oldName ? { ...item, category: newName } : item
             )
           );
-          if (isRemoteMode && profile?.id) {
+          if (isRemoteMode && authUserId) {
             void supabase
               .from("categories")
               .update({ name: newName })
               .eq("id", id)
-              .eq("user_id", profile.id);
+              .eq("user_id", authUserId);
           }
         }
 
@@ -492,17 +537,17 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         );
       });
     },
-    [isRemoteMode, profile?.id]
+    [isRemoteMode, authUserId]
   );
 
   const deleteCategory = useCallback(
     (id: string) => {
       setCategories((prev) => prev.filter((c) => c.id !== id));
-      if (isRemoteMode && profile?.id) {
-        void supabase.from("categories").delete().eq("id", id).eq("user_id", profile.id);
+      if (isRemoteMode && authUserId) {
+        void supabase.from("categories").delete().eq("id", id).eq("user_id", authUserId);
       }
     },
-    [isRemoteMode, profile?.id],
+    [isRemoteMode, authUserId],
   );
 
   const searchItems = useCallback(

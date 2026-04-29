@@ -6,9 +6,10 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useShareIntent } from "expo-share-intent";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Linking } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -29,6 +30,8 @@ function RootLayoutNav() {
   const { mode, isHydrated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  const lastHandledShareUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isHydrated || mode === null) return;
@@ -118,6 +121,35 @@ function RootLayoutNav() {
 
     return () => sub.remove();
   }, [isHydrated, mode, pathname, router]);
+
+  useEffect(() => {
+    if (!isHydrated || mode === null || !hasShareIntent) return;
+
+    const extractFirstHttpUrl = (text: string): string | undefined => {
+      const match = text.match(/https?:\/\/[^\s<>"')\]}]+/i);
+      if (!match?.[0]) return undefined;
+      return match[0].replace(/[),.;!?]+$/, "");
+    };
+
+    const sharedText = (shareIntent?.text || "").trim();
+    const sharedWebUrl = (shareIntent?.webUrl || "").trim();
+    const candidate =
+      (/^https?:\/\//i.test(sharedWebUrl) ? sharedWebUrl : undefined) ||
+      extractFirstHttpUrl(sharedText) ||
+      (/^https?:\/\//i.test(sharedText) ? sharedText : undefined);
+
+    if (!candidate || lastHandledShareUrlRef.current === candidate) return;
+    lastHandledShareUrlRef.current = candidate;
+
+    console.log("[share-intent] received payload", shareIntent);
+    console.log("[share-intent] extracted url", candidate);
+
+    router.replace({
+      pathname: "/add",
+      params: { url: candidate },
+    });
+    resetShareIntent(true);
+  }, [isHydrated, mode, hasShareIntent, shareIntent, resetShareIntent, router]);
 
   if (!isHydrated) return null;
   if (mode === null) return <AuthScreenContent />;

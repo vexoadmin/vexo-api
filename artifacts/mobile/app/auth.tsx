@@ -5,6 +5,7 @@ import * as Linking from "expo-linking";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -81,7 +82,9 @@ export function AuthScreenContent({
     setSuccessMessage("");
     const result = await signInWithGoogle();
     if (!result.ok) {
-      setErrorMessage(result.reason || "Unable to sign in with Google.");
+      const message = result.reason || "Unable to sign in with Google.";
+      setErrorMessage(message);
+      Alert.alert("Google sign-in failed", message);
       return;
     }
     onFinished?.();

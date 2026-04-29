@@ -46,6 +46,8 @@ type AuthContextValue = {
 
 const GUEST_KEY = "@vexo_guest_mode_v1";
 const AuthContext = createContext<AuthContextValue | null>(null);
+const GOOGLE_CONFLICT_MESSAGE =
+  "This email may already be registered with email and password. Please sign in with email/password, or reset your password.";
 
 function parseHashParams(url: string): Record<string, string> {
   const hashIndex = url.indexOf("#");
@@ -113,6 +115,28 @@ function isEmailNotConfirmedError(error: unknown): boolean {
   const message = String(record["message"] || "").toLowerCase();
   const text = `${code} ${message}`;
   return text.includes("email not confirmed") || text.includes("email_not_confirmed");
+}
+
+function isGoogleIdentityConflictError(error: unknown): boolean {
+  const record = (error || {}) as Record<string, unknown>;
+  const code = String(record["code"] || "").toLowerCase();
+  const message = String(record["message"] || "").toLowerCase();
+  const text = `${code} ${message}`;
+  return (
+    text.includes("identity") && text.includes("already") ||
+    text.includes("already registered") ||
+    text.includes("already exists") ||
+    text.includes("email_exists") ||
+    text.includes("account exists")
+  );
+}
+
+function normalizeGoogleAuthErrorReason(error: unknown, fallback?: string): string {
+  if (isGoogleIdentityConflictError(error)) return GOOGLE_CONFLICT_MESSAGE;
+  const record = (error || {}) as Record<string, unknown>;
+  const message = typeof record["message"] === "string" ? record["message"] : "";
+  if (message.toLowerCase().includes("oauth")) return GOOGLE_CONFLICT_MESSAGE;
+  return fallback || message || "Google sign-in failed. Try again.";
 }
 
 async function fetchGoogleUser(accessToken: string): Promise<AuthUser | null> {
@@ -189,7 +213,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
       console.log("OAuth handler exchangeCodeForSession error:", exchangeError ?? null);
       if (exchangeError) {
-        return { ok: false, reason: exchangeError.message };
+        console.log("[AUTH GOOGLE] exchange code failed:", exchangeError);
+        return {
+          ok: false,
+          reason: normalizeGoogleAuthErrorReason(
+            exchangeError,
+            "Google sign-in could not be completed.",
+          ),
+        };
       }
       const { data: sessionData } = await supabase.auth.getSession();
       console.log("OAuth handler getSession after exchange:", sessionData);
@@ -214,7 +245,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { accessToken, refreshToken } = parseAuthTokens(url, undefined);
     if (!accessToken || !refreshToken) {
-      return { ok: false, reason: "OAuth callback missing required session tokens." };
+      console.log("[AUTH GOOGLE] callback missing session tokens", { url });
+      return {
+        ok: false,
+        reason: normalizeGoogleAuthErrorReason(
+          { message: "OAuth callback missing required session tokens." },
+          "Google sign-in could not be completed.",
+        ),
+      };
     }
 
     const { error: setSessionError } = await supabase.auth.setSession({
@@ -222,7 +260,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refresh_token: refreshToken,
     });
     if (setSessionError) {
-      return { ok: false, reason: setSessionError.message };
+      console.log("[AUTH GOOGLE] setSession failed:", setSessionError);
+      return {
+        ok: false,
+        reason: normalizeGoogleAuthErrorReason(
+          setSessionError,
+          "Google sign-in could not be completed.",
+        ),
+      };
     }
 
     const googleUser = await fetchGoogleUser(accessToken);
@@ -337,14 +382,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const result = await finalizeSessionFromUrl(url);
         if (oauthPendingRef.current) {
+          if (!result.ok) {
+            console.log("[AUTH GOOGLE] callback finalize result not ok:", result.reason);
+          }
           oauthPendingRef.current.resolve(result);
           oauthPendingRef.current = null;
         }
       } catch (error) {
+        console.log("[AUTH GOOGLE] callback finalize exception:", error);
         if (oauthPendingRef.current) {
           oauthPendingRef.current.resolve({
             ok: false,
-            reason: "Failed to finalize Google sign-in.",
+            reason: normalizeGoogleAuthErrorReason(
+              error,
+              "Google sign-in could not be completed.",
+            ),
           });
           oauthPendingRef.current = null;
         }
@@ -381,7 +433,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Google OAuth data.url:", data?.url);
 
       if (error || !data?.url) {
-        return { ok: false, reason: error?.message || "Failed to start Google sign-in." };
+        console.log("[AUTH GOOGLE] signInWithOAuth failed:", error || "missing data.url");
+        return {
+          ok: false,
+          reason: normalizeGoogleAuthErrorReason(
+            error || { message: "Failed to start Google sign-in." },
+            "Google sign-in could not be started.",
+          ),
+        };
       }
 
       await WebBrowser.dismissBrowser();
@@ -402,8 +461,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       return await Promise.race([completion, timeout]);
 
-    } catch {
-      return { ok: false, reason: "Google sign-in failed. Try again." };
+    } catch (error) {
+      console.log("[AUTH GOOGLE] unexpected sign-in exception:", error);
+      return {
+        ok: false,
+        reason: normalizeGoogleAuthErrorReason(error, "Google sign-in failed. Try again."),
+      };
     } finally {
       setIsAuthenticating(false);
     }

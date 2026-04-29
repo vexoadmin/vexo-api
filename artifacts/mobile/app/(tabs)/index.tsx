@@ -84,12 +84,30 @@ export default function HomeScreen() {
     return list;
   }, [items, searchQuery, selectedCategory, searchItems]);
 
+  useEffect(() => {
+    console.log("[UI] items received:", items);
+  }, [items]);
+
   const leftColumn = displayedItems.filter((_, i) => i % 2 === 0);
   const rightColumn = displayedItems.filter((_, i) => i % 2 === 1);
 
   const categoryList = ["All", ...categories.map((c) => c.name)];
   const hasAnyItems = items.length > 0;
   const isFilteredEmpty = displayedItems.length === 0 && hasAnyItems;
+  const isFirstTimeEmpty =
+    displayedItems.length === 0 && !hasAnyItems && searchQuery.trim().length === 0
+    && selectedCategory === "All";
+
+  useEffect(() => {
+    console.log("[UI] items received count:", items.length);
+    console.log("[UI] displayedItems count:", displayedItems.length);
+    console.log("[UI] hasAnyItems:", hasAnyItems);
+    console.log("[UI] isFirstTimeEmpty:", isFirstTimeEmpty);
+    console.log("[UI] search query/filter state:", {
+      searchQuery,
+      selectedCategory,
+    });
+  }, [items.length, displayedItems.length, hasAnyItems, isFirstTimeEmpty, searchQuery, selectedCategory]);
 
   useEffect(() => {
     const key = `vexo_tutorial_seen:${profile?.id || "default"}`;
