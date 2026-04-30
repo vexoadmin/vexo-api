@@ -80,14 +80,23 @@ export function AuthScreenContent({
   async function handleGoogleLogin() {
     setErrorMessage("");
     setSuccessMessage("");
-    const result = await signInWithGoogle();
-    if (!result.ok) {
-      const message = result.reason || "Unable to sign in with Google.";
+    console.log("[AUTH DEBUG] Google login trigger start");
+    try {
+      const result = await signInWithGoogle();
+      console.log("[AUTH DEBUG] Google login result:", result);
+      if (!result.ok) {
+        const message = result.reason || "Unable to sign in with Google.";
+        setErrorMessage(message);
+        Alert.alert("Google sign-in failed", message);
+        return;
+      }
+      onFinished?.();
+    } catch (error) {
+      console.log("[AUTH DEBUG] Google login error object:", error);
+      const message = "Unable to sign in with Google.";
       setErrorMessage(message);
       Alert.alert("Google sign-in failed", message);
-      return;
     }
-    onFinished?.();
   }
 
   async function handleCreateAccount() {

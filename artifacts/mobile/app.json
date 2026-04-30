@@ -17,6 +17,7 @@
       "supportsTablet": false
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/vexo-app-icon.png",
         "backgroundColor": "#0B0F1A"

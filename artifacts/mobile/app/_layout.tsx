@@ -27,11 +27,20 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const colors = useColors();
-  const { mode, isHydrated } = useAuth();
+  const { mode, isHydrated, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const lastHandledShareUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    console.log("[AUTH DEBUG] layout auth state:", {
+      isHydrated,
+      mode,
+      hasUser: !!user,
+      userId: user?.id ?? null,
+    });
+  }, [isHydrated, mode, user?.id]);
 
   useEffect(() => {
     if (!isHydrated || mode === null) return;
@@ -151,6 +160,11 @@ function RootLayoutNav() {
     resetShareIntent(true);
   }, [isHydrated, mode, hasShareIntent, shareIntent, resetShareIntent, router]);
 
+  console.log("[AUTH DEBUG] layout navigation decision:", {
+    isHydrated,
+    hasUser: !!user,
+    mode,
+  });
   if (!isHydrated) return null;
   if (mode === null) return <AuthScreenContent />;
 

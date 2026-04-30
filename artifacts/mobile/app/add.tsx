@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   ActivityIndicator,
   Alert,
@@ -242,6 +243,8 @@ export default function AddScreen() {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryError, setCategoryError] = useState("");
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const userTypedTitle = useRef(false);
   const lastAutoFilledTitle = useRef("");
@@ -254,6 +257,7 @@ export default function AddScreen() {
     ? PLATFORM_COLORS[detectedPlatform]
     : "#6366F1";
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom + 16;
+  const saveFooterBottomSpacing = Math.max(insets.bottom, 24) + 16;
 
   const displayThumbnailUrl = useMemo(() => {
     if (!url.trim() || !isValidUrl(url)) return undefined;
@@ -289,6 +293,10 @@ export default function AddScreen() {
     : hasPreviewFallback
       ? "Preview limited"
       : "Link saved";
+  const trimmedCategorySearch = categorySearchQuery.trim().toLowerCase();
+  const filteredCategories = categories.filter((category) =>
+    category.name.toLowerCase().includes(trimmedCategorySearch)
+  );
 
   useEffect(() => {
     const rawIncomingUrl = Array.isArray(incomingUrlParam)
@@ -347,6 +355,7 @@ export default function AddScreen() {
     }
 
     const normalized = normalizeUrl(trimmedUrl);
+    console.log("[METADATA DEBUG] before metadata fetch URL:", normalized);
     const currentRequestId = requestIdRef.current + 1;
     requestIdRef.current = currentRequestId;
 
@@ -402,6 +411,7 @@ export default function AddScreen() {
       } catch {
         meta = {};
       }
+      console.log("[METADATA DEBUG] after metadata fetch result:", meta);
       console.log("AddScreen metadata returned:", {
         inputUrl: normalized,
         meta,
@@ -568,7 +578,12 @@ export default function AddScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  function handleSave() {
+  function closeAddScreen() {
+    router.replace("/");
+  }
+
+  async function handleSave() {
+    if (isSaving) return;
     let valid = true;
     const normalized = normalizeUrl(url);
     const selectedCategoryMatch = categories.find(
@@ -590,6 +605,14 @@ export default function AddScreen() {
       title.trim() ||
       fetchedMeta?.title?.trim() ||
       smartFallbackTitle(normalized, detectedPlatform);
+    if (!title.trim() && !fetchedMeta?.title?.trim()) {
+      console.log("[METADATA DEBUG] fallback title used:", {
+        reason: "manual title empty and fetched metadata title missing",
+        platform: detectedPlatform,
+        url: normalized,
+        fallbackTitle: finalTitle,
+      });
+    }
 
     if (!finalTitle.trim()) {
       setTitleError("Please add a title before saving");
@@ -612,8 +635,6 @@ export default function AddScreen() {
 
     const finalCategoryName =
       selectedCategoryMatch?.name || selectedCategory.trim();
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     let thumbnailUrl =
       fetchedMeta?.thumbnailUrl ||
@@ -646,13 +667,32 @@ export default function AddScreen() {
       thumbnailUrl,
       reminder,
     };
+    console.log("[METADATA DEBUG] before save:", {
+      finalTitle,
+      thumbnail_url: addPayload.thumbnailUrl,
+      url: addPayload.url,
+    });
     console.log("AddScreen addItem payload:", addPayload);
 
-    addItem({
+    setIsSaving(true);
+    const result = await addItem({
       ...addPayload,
     });
+    setIsSaving(false);
 
-    router.back();
+    if (!result.ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Save failed", result.reason || "Could not save this item.");
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Saved successfully", "Your item was saved.", [
+      {
+        text: "OK",
+        onPress: closeAddScreen,
+      },
+    ]);
   }
 
   function formatReminder(ts: number) {
@@ -676,7 +716,7 @@ export default function AddScreen() {
           title: "Save Video",
           headerLeft: () => (
             <Pressable
-              onPress={() => router.back()}
+              onPress={closeAddScreen}
               hitSlop={10}
               style={{ paddingHorizontal: 4 }}
             >
@@ -686,10 +726,18 @@ export default function AddScreen() {
         }}
       />
 
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+      <KeyboardAwareScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[
+          styles.content,
+          { flexGrow: 1, paddingBottom: bottomPadding + 160 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        enableOnAndroid={true}
+        extraScrollHeight={120}
+        extraHeight={120}
       >
         <View style={styles.section}>
           <Text style={styles.label}>VIDEO LINK</Text>
@@ -928,14 +976,20 @@ export default function AddScreen() {
 
         <View style={styles.section}>
           <Text style={styles.label}>CATEGORY</Text>
-
+          <TextInput
+            value={categorySearchQuery}
+            onChangeText={setCategorySearchQuery}
+            placeholder="Search category"
+            placeholderTextColor="rgba(255,255,255,0.28)"
+            style={styles.categorySearchInput}
+          />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.chipScroll}
           >
             <View style={styles.chipRow}>
-              {categories.map((cat) => {
+              {filteredCategories.map((cat) => {
                 const active = selectedCategory === cat.name;
 
                 return (
@@ -984,7 +1038,9 @@ export default function AddScreen() {
               </Pressable>
             </View>
           </ScrollView>
-
+          {trimmedCategorySearch.length > 0 && filteredCategories.length === 0 && (
+            <Text style={styles.categorySearchEmptyText}>No categories found</Text>
+          )}
           {creatingCategory && (
             <View style={styles.newCategoryBox}>
               <View style={styles.newCategoryInputRow}>
@@ -1134,9 +1190,11 @@ export default function AddScreen() {
 
         <Pressable
           onPress={handleSave}
+          disabled={isSaving}
           style={({ pressed }) => [
             styles.saveWrap,
-            { opacity: pressed ? 0.85 : 1 },
+            { marginBottom: saveFooterBottomSpacing },
+            { opacity: isSaving ? 0.7 : pressed ? 0.85 : 1 },
           ]}
         >
           <LinearGradient
@@ -1145,11 +1203,20 @@ export default function AddScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.saveBtn}
           >
-            <Feather name="bookmark" size={17} color="#fff" />
-            <Text style={styles.saveBtnText}>Save to Vexo Save</Text>
+            {isSaving ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.saveBtnText}>Saving...</Text>
+              </>
+            ) : (
+              <>
+                <Feather name="bookmark" size={17} color="#fff" />
+                <Text style={styles.saveBtnText}>Save to Vexo Save</Text>
+              </>
+            )}
           </LinearGradient>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -1393,7 +1460,23 @@ const styles = StyleSheet.create({
   },
 
   chipScroll: { marginHorizontal: -20 },
-
+  categorySearchInput: {
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#FFFFFF",
+  },
+  categorySearchEmptyText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.50)",
+    paddingHorizontal: 4,
+  },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",

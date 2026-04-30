@@ -59,6 +59,7 @@
     "@react-native-community/datetimepicker": "^8.4.4",
     "@supabase/supabase-js": "^2.104.1",
     "expo-share-intent": "5.1.1",
+    "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-url-polyfill": "^3.0.0"
   }
 }

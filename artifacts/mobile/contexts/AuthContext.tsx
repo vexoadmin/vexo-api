@@ -182,9 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const oauthPendingRef = useRef<{
-    resolve: (result: AuthActionResult) => void;
-  } | null>(null);
 
   async function setSessionFromResetUrl(url: string): Promise<void> {
     const queryParams = parseQueryParams(url);
@@ -197,20 +194,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function finalizeSessionFromUrl(url: string): Promise<AuthActionResult> {
+    const lowerUrl = url.toLowerCase();
+    const isAuthCallback = lowerUrl.startsWith("vexo://auth");
+    console.log("[GOOGLE DEBUG] finalizeSessionFromUrl received url:", url);
+    console.log("[GOOGLE DEBUG] finalizeSessionFromUrl startsWith:", {
+      vexoAuth: lowerUrl.startsWith("vexo://auth"),
+      exp: url.toLowerCase().startsWith("exp://"),
+    });
     console.log("OAuth handler received url:", url);
-    console.log(
-      "OAuth handler startsWith vexo://auth:",
-      url.toLowerCase().startsWith("vexo://auth"),
-    );
-    if (!url.toLowerCase().startsWith("vexo://auth")) {
+    console.log("OAuth handler is auth callback:", isAuthCallback);
+    if (!isAuthCallback) {
       return { ok: false, reason: "Ignored non-auth callback URL." };
     }
 
     const queryParams = parseQueryParams(url);
     const code = queryParams["code"];
+    console.log("[GOOGLE DEBUG] finalizeSessionFromUrl parsed code exists:", !!code);
     console.log("OAuth handler parsed code:", code ?? null);
     if (code) {
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      console.log("[GOOGLE DEBUG] exchangeCodeForSession result:", {
+        success: !exchangeError,
+        error: exchangeError ?? null,
+      });
       console.log("OAuth handler exchangeCodeForSession error:", exchangeError ?? null);
       if (exchangeError) {
         console.log("[AUTH GOOGLE] exchange code failed:", exchangeError);
@@ -223,6 +229,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
       const { data: sessionData } = await supabase.auth.getSession();
+      console.log("[GOOGLE DEBUG] getSession after exchange:", {
+        hasSession: !!sessionData.session,
+        userId: sessionData.session?.user?.id ?? null,
+        email: sessionData.session?.user?.email ?? null,
+      });
       console.log("OAuth handler getSession after exchange:", sessionData);
       const activeSession = sessionData.session;
       if (activeSession?.user) {
@@ -299,11 +310,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
+        console.log("[AUTH DEBUG] getSession start");
         const { data: sessionData } = await supabase.auth.getSession();
+        console.log("[AUTH DEBUG] getSession result:", {
+          hasSession: !!sessionData.session,
+          userId: sessionData.session?.user?.id ?? null,
+          email: sessionData.session?.user?.email ?? null,
+        });
 
         const activeSession = sessionData.session;
         if (activeSession?.user) {
           setSession(activeSession);
+          console.log("[AUTH DEBUG] user state set:", {
+            userId: activeSession.user.id,
+            email: activeSession.user.email ?? null,
+          });
           setUser(activeSession.user);
           setProfile({
             id: activeSession.user.id,
@@ -319,22 +340,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           setMode("authenticated");
         } else {
+          console.log("[AUTH DEBUG] user state cleared (no active session)");
           setMode(null);
           setUser(null);
           setProfile(null);
           setSession(null);
         }
       } catch {
+        console.log("[AUTH DEBUG] getSession threw error");
+        console.log("[AUTH DEBUG] user state cleared (getSession error)");
         setMode(null);
         setUser(null);
         setProfile(null);
         setSession(null);
       } finally {
         setIsHydrated(true);
+        console.log("[AUTH DEBUG] auth loading false (isHydrated=true)");
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      console.log("[AUTH DEBUG] onAuthStateChange:", {
+        event,
+        hasSession: !!nextSession,
+        userId: nextSession?.user?.id ?? null,
+        email: nextSession?.user?.email ?? null,
+      });
       setSession(nextSession);
       if (nextSession?.user) {
         const nextProfile: AuthUser = {
@@ -349,12 +380,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             | string
             | undefined,
         };
+        console.log("[AUTH DEBUG] user state set:", {
+          userId: nextSession.user.id,
+          email: nextSession.user.email ?? null,
+        });
         setUser(nextSession.user);
         setProfile(nextProfile);
         setMode("authenticated");
         void AsyncStorage.setItem(GUEST_KEY, "0");
         void ensureProfileRow(nextProfile);
       } else {
+        console.log("[AUTH DEBUG] user state cleared (auth state change)");
         setUser(null);
         setProfile(null);
         setMode(null);
@@ -369,6 +405,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleIncomingUrl = async (url: string) => {
+      console.log("[AUTH DEBUG] handleIncomingUrl received:", url);
       const lowerUrl = url.toLowerCase();
       if (!lowerUrl.startsWith("vexo://auth")) return;
       if (lowerUrl.startsWith("vexo://auth/reset-password")) {
@@ -380,34 +417,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const result = await finalizeSessionFromUrl(url);
-        if (oauthPendingRef.current) {
-          if (!result.ok) {
-            console.log("[AUTH GOOGLE] callback finalize result not ok:", result.reason);
-          }
-          oauthPendingRef.current.resolve(result);
-          oauthPendingRef.current = null;
-        }
+        await finalizeSessionFromUrl(url);
       } catch (error) {
         console.log("[AUTH GOOGLE] callback finalize exception:", error);
-        if (oauthPendingRef.current) {
-          oauthPendingRef.current.resolve({
-            ok: false,
-            reason: normalizeGoogleAuthErrorReason(
-              error,
-              "Google sign-in could not be completed.",
-            ),
-          });
-          oauthPendingRef.current = null;
-        }
       }
     };
 
     const sub = Linking.addEventListener("url", (event) => {
+      console.log("[GOOGLE DEBUG] Linking url event:", event.url);
+      console.log("[AUTH DEBUG] Linking url event:", event.url);
       void handleIncomingUrl(event.url);
     });
 
     void Linking.getInitialURL().then((initialUrl) => {
+      console.log("[GOOGLE DEBUG] initial URL:", initialUrl);
+      console.log("[AUTH DEBUG] initial URL:", initialUrl);
       if (initialUrl) {
         void handleIncomingUrl(initialUrl);
       }
@@ -422,6 +446,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticating(true);
     try {
       const redirectTo = "vexo://auth";
+      console.log("[GOOGLE DEBUG] before signInWithOAuth");
+      console.log("[AUTH DEBUG] redirectTo computed:", redirectTo);
       console.log("Google OAuth redirectTo:", redirectTo);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -429,6 +455,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           redirectTo,
           skipBrowserRedirect: true,
         },
+      });
+      console.log("[GOOGLE DEBUG] after signInWithOAuth:", {
+        hasUrl: !!data?.url,
+        hasError: !!error,
       });
       console.log("Google OAuth data.url:", data?.url);
 
@@ -443,23 +473,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      await WebBrowser.dismissBrowser();
-      await Linking.openURL(data.url);
-
-      const completion = new Promise<AuthActionResult>((resolve) => {
-        oauthPendingRef.current = { resolve };
+      console.log("[GOOGLE DEBUG] before opening browser/url");
+      const browserResult = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      const browserResultHasUrl =
+        "url" in browserResult &&
+        typeof browserResult.url === "string" &&
+        browserResult.url.length > 0;
+      console.log("[GOOGLE DEBUG] after browser/url returns:", {
+        type: browserResult.type,
+        hasUrl: browserResultHasUrl,
       });
-      const timeout = new Promise<AuthActionResult>((resolve) =>
-        setTimeout(
-          () =>
-            resolve({
-              ok: false,
-              reason: "Google sign-in timed out. Please try again.",
-            }),
-          120000,
-        ),
-      );
-      return await Promise.race([completion, timeout]);
+      console.log("[AUTH DEBUG] openAuthSessionAsync result:", browserResult);
+      if (browserResult.type === "success" && browserResult.url) {
+        return await finalizeSessionFromUrl(browserResult.url);
+      }
+      return {
+        ok: false,
+        reason:
+          browserResult.type === "cancel"
+            ? "Google sign-in was cancelled."
+            : "Google sign-in did not return a callback URL.",
+      };
 
     } catch (error) {
       console.log("[AUTH GOOGLE] unexpected sign-in exception:", error);

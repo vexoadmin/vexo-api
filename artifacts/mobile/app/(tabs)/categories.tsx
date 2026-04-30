@@ -53,6 +53,7 @@ export default function CategoriesScreen() {
   const [formName, setFormName] = useState("");
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedIcon, setSelectedIcon] = useState(0);
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const listRef = useRef<FlatList<number> | null>(null);
   const formInputRef = useRef<TextInput | null>(null);
 
@@ -67,6 +68,13 @@ export default function CategoriesScreen() {
     }
     return counts;
   }, [items]);
+  const filteredCategories = useMemo(() => {
+    const normalizedQuery = categorySearchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return categories;
+    return categories.filter((category) =>
+      category.name.toLowerCase().includes(normalizedQuery)
+    );
+  }, [categories, categorySearchQuery]);
 
   const scrollToFormAndFocus = useCallback(() => {
     requestAnimationFrame(() => {
@@ -305,12 +313,22 @@ export default function CategoriesScreen() {
               </View>
             )}
 
+            <View style={styles.searchWrap}>
+              <TextInput
+                value={categorySearchQuery}
+                onChangeText={setCategorySearchQuery}
+                placeholder="Search categories"
+                placeholderTextColor="rgba(255,255,255,0.30)"
+                style={styles.searchInput}
+              />
+            </View>
+
             <Text style={styles.sectionLabel}>ALL COLLECTIONS</Text>
           </View>
         }
         renderItem={() => (
           <View style={styles.grid}>
-            {categories.map((category, i) => (
+            {filteredCategories.map((category, i) => (
               <CategoryCard
                 key={category.id}
                 category={category}
@@ -322,8 +340,13 @@ export default function CategoriesScreen() {
                 index={i}
               />
             ))}
-            <AddCategoryCard onPress={openAdd} />
-            {(categories.length + 1) % 2 !== 0 && <View style={styles.gridPad} />}
+            {!categorySearchQuery.trim() && <AddCategoryCard onPress={openAdd} />}
+            {categorySearchQuery.trim().length > 0 && filteredCategories.length === 0 && (
+              <Text style={styles.searchEmptyText}>No categories found</Text>
+            )}
+            {(filteredCategories.length + (categorySearchQuery.trim() ? 0 : 1)) % 2 !== 0 && (
+              <View style={styles.gridPad} />
+            )}
           </View>
         )}
       />
@@ -437,6 +460,29 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1.2,
     color: "rgba(255,255,255,0.20)", marginBottom: 10, paddingHorizontal: 5,
+  },
+  searchWrap: {
+    paddingHorizontal: 5,
+    marginBottom: 10,
+  },
+  searchInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  searchEmptyText: {
+    width: "100%",
+    textAlign: "center",
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    paddingVertical: 18,
   },
 
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },

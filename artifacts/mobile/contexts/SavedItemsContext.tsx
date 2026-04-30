@@ -33,7 +33,9 @@ export interface Category {
 interface SavedItemsContextType {
   items: SavedItem[];
   categories: Category[];
-  addItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
+  addItem: (
+    item: Omit<SavedItem, "id" | "createdAt">
+  ) => Promise<{ ok: boolean; reason?: string }>;
   deleteItem: (id: string) => void;
   updateItem: (id: string, updates: Partial<SavedItem>) => void;
   addCategory: (category: Omit<Category, "id">) => void;
@@ -52,17 +54,79 @@ function normalizeCategoryName(name: string) {
 }
 
 function dedupeCategories(input: Category[]): Category[] {
-  const seen = new Set<string>();
+  console.log(
+    "[CATEGORY DEBUG] dedupe input names/ids:",
+    input.map((category) => ({ id: category.id, name: category.name })),
+  );
+  const seenIndexByName = new Map<string, number>();
   const out: Category[] = [];
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const styleForCategory = (name: string) => {
+    const normalized = normalizeCategoryName(name);
+    const existing =
+      DEFAULT_CATEGORIES.find(
+        (category) => normalizeCategoryName(category.name) === normalized,
+      ) || DEFAULT_CATEGORIES[Math.abs(normalized.length) % DEFAULT_CATEGORIES.length];
+    return { color: existing.color, icon: existing.icon };
+  };
 
   for (const category of input) {
     const normalized = normalizeCategoryName(category.name);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    out.push({ ...category, name: category.name.trim() });
+    if (!normalized) continue;
+    const style = styleForCategory(category.name);
+    const normalizedCategory: Category = {
+      ...category,
+      name: category.name.trim(),
+      color: style.color,
+      icon: style.icon,
+    };
+    const existingIndex = seenIndexByName.get(normalized);
+    if (existingIndex === undefined) {
+      seenIndexByName.set(normalized, out.length);
+      out.push(normalizedCategory);
+      continue;
+    }
+
+    const existingCategory = out[existingIndex];
+    const existingIsUuid = uuidRegex.test(existingCategory.id);
+    const nextIsUuid = uuidRegex.test(normalizedCategory.id);
+
+    if (!existingIsUuid && nextIsUuid) {
+      console.log("[CATEGORY DEBUG] dedupe removed duplicate category", {
+        name: normalized,
+        id: existingCategory.id,
+      });
+      out[existingIndex] = normalizedCategory;
+      continue;
+    }
+
+    console.log("[CATEGORY DEBUG] dedupe removed duplicate category", {
+      name: normalized,
+      id: normalizedCategory.id,
+    });
   }
 
+  console.log(
+    "[CATEGORY DEBUG] dedupe output names/ids:",
+    out.map((category) => ({ id: category.id, name: category.name })),
+  );
+  if (out.length === input.length) {
+    console.log("[CATEGORY DEBUG] duplicate names removed: none");
+  }
   return out;
+}
+
+function findDuplicateCategoryNames(input: { name: string }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const category of input) {
+    const normalized = normalizeCategoryName(category.name);
+    if (!normalized) continue;
+    counts.set(normalized, (counts.get(normalized) || 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .filter(([, count]) => count > 1)
+    .map(([name]) => name);
 }
 
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -123,6 +187,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   }, [categories, loaded, isRemoteMode]);
 
   async function loadLocalData() {
+    console.log("[SAVED DEBUG] loadLocalData start");
     try {
       const [storedItems, storedCategories] = await Promise.all([
         AsyncStorage.getItem(ITEMS_KEY),
@@ -133,14 +198,23 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         ? JSON.parse(storedCategories)
         : DEFAULT_CATEGORIES;
       const normalizedCategories = dedupeCategories(parsedCategories);
+      console.log("[SAVED DEBUG] loadLocalData parsed counts:", {
+        loadedItems: loadedItems.length,
+        loadedCategories: normalizedCategories.length,
+      });
+      console.log("[SAVED DEBUG] setting local items with count:", loadedItems.length);
       setItems(loadedItems);
       setCategories(normalizedCategories);
       /* Repair missing thumbnails in the background — never blocks the UI */
       repairMissingThumbnails(loadedItems);
+      console.log("[SAVED DEBUG] loadLocalData end");
     } catch {
+      console.log("[SAVED DEBUG] loadLocalData error");
+      console.log("[SAVED DEBUG] setItems empty called from loadLocalData catch");
       setItems([]);
       setCategories(DEFAULT_CATEGORIES);
       repairMissingThumbnails([]);
+      console.log("[SAVED DEBUG] loadLocalData end");
     }
     if (mountedRef.current) setLoaded(true);
   }
@@ -155,6 +229,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   }
 
   async function loadRemoteData(userId: string) {
+    console.log("[SAVED DEBUG] loadRemoteData start:", { userId });
     try {
       console.log("[LOAD] auth user id:", userId);
       console.log("[LOAD DEBUG] user_id used:", userId);
@@ -172,6 +247,25 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
           .eq("user_id", userId)
           .order("created_at", { ascending: false }),
       ]);
+      console.log(
+        "[CATEGORY DEBUG] loadRemoteData raw catRes.data:",
+        (catRes.data || []).map((cat) => ({
+          id: cat.id,
+          name: cat.name,
+          created_at: cat.created_at,
+        })),
+      );
+      console.log(
+        "[CATEGORY DEBUG] loadRemoteData categories returned count:",
+        catRes.data?.length ?? 0,
+      );
+      console.log("[SAVED DEBUG] loadRemoteData query results:", {
+        userId,
+        categoriesCount: catRes.data?.length ?? 0,
+        savedItemsCount: itemRes.data?.length ?? 0,
+        catResError: catRes.error ?? null,
+        itemResError: itemRes.error ?? null,
+      });
 
       console.log("[LOAD] saved_items query error:", itemRes.error);
       console.log("[LOAD ERROR] saved_items error:", itemRes.error);
@@ -194,8 +288,27 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
           icon: style.icon,
         };
       });
+      console.log(
+        "[CATEGORY DEBUG] remoteCategories names/ids:",
+        remoteCategories.map((cat) => ({ id: cat.id, name: cat.name })),
+      );
+      const remoteDuplicateNames = findDuplicateCategoryNames(remoteCategories);
+      if (remoteDuplicateNames.length > 0) {
+        console.warn(
+          "[categories] duplicate categories detected on remote load:",
+          remoteDuplicateNames,
+        );
+      }
+      const mergedCategories = dedupeCategories([
+        ...DEFAULT_CATEGORIES,
+        ...remoteCategories,
+      ]);
+      console.log(
+        "[CATEGORY DEBUG] mergedCategories names/ids:",
+        mergedCategories.map((cat) => ({ id: cat.id, name: cat.name })),
+      );
 
-      const categoryNameById = new Map(remoteCategories.map((c) => [c.id, c.name]));
+      const categoryNameById = new Map(mergedCategories.map((c) => [c.id, c.name]));
 
       const remoteItems: SavedItem[] = (itemRes.data || [])
         .map((item: any) => ({
@@ -215,37 +328,57 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
             ? new Date(item.reminder_date).getTime()
             : undefined,
         }));
+      console.log("[SAVED DEBUG] remoteItems length before setItems:", remoteItems.length);
       console.log("[LOAD] mapped items count:", remoteItems.length);
       console.log("[LOAD] final state items count before setItems:", remoteItems.length);
 
       if (mountedRef.current) {
         console.log("SavedItems loadRemoteData mapped items:", remoteItems.slice(0, 5));
-        setCategories(
-          remoteCategories.length > 0 ? remoteCategories : DEFAULT_CATEGORIES,
-        );
+        console.log("[SAVED DEBUG] setting remote items with count:", remoteItems.length);
+        setCategories(mergedCategories);
         setItems(remoteItems);
         setLoaded(true);
       }
+      console.log("[SAVED DEBUG] loadRemoteData end");
     } catch (error) {
       console.log("[LOAD] saved_items query error:", error);
       // In authenticated mode, never fall back to potentially stale local user data.
       if (mountedRef.current) {
+        console.log("[SAVED DEBUG] setItems empty called from loadRemoteData catch");
         setItems([]);
         setCategories(DEFAULT_CATEGORIES);
         setLoaded(true);
       }
+      console.log("[SAVED DEBUG] loadRemoteData end");
     }
   }
 
   useEffect(() => {
+    console.log("[SAVED DEBUG] auth load effect run:", {
+      authHydrated,
+      isRemoteMode,
+      authUserId,
+      path:
+        !authHydrated
+          ? "return (not hydrated)"
+          : isRemoteMode && authUserId
+            ? "loadRemoteData"
+            : "loadLocalData",
+    });
     if (!authHydrated) return;
     setLoaded(false);
-    if (isRemoteMode && authUserId) {
+    if (authUserId) {
+      console.log("[SAVED DEBUG] auth load effect path: loadRemoteData");
       void loadRemoteData(authUserId);
     } else {
-      void loadLocalData();
+      console.log("[SAVED DEBUG] skipping local load during auth");
+      console.log("[SAVED DEBUG] unauthenticated mode: clearing local beta data");
+      console.log("[SAVED DEBUG] setItems empty called from auth load effect unauthenticated branch");
+      setItems([]);
+      setCategories(DEFAULT_CATEGORIES);
+      setLoaded(true);
     }
-  }, [authHydrated, isRemoteMode, authUserId]);
+  }, [authHydrated, authUserId, isRemoteMode]);
 
   function categoryIdByName(name: string): string | undefined {
     const normalized = normalizeCategoryName(name);
@@ -253,20 +386,44 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   }
 
   async function upsertRemoteCategory(userId: string, name: string): Promise<string | null> {
+    const trimmedName = name.trim();
+    const normalizedName = normalizeCategoryName(trimmedName);
+    if (!normalizedName) return null;
+
     const existing = categories.find(
-      (c) => normalizeCategoryName(c.name) === normalizeCategoryName(name),
+      (c) => normalizeCategoryName(c.name) === normalizedName,
     );
     if (existing && isUuid(existing.id)) return existing.id;
 
+    const existingRemote = await supabase
+      .from("categories")
+      .select("id,name")
+      .eq("user_id", userId)
+      .ilike("name", trimmedName);
+    if (existingRemote.error) {
+      return null;
+    }
+    const normalizedRemoteMatches = (existingRemote.data || []).filter(
+      (cat) => normalizeCategoryName(cat.name) === normalizedName,
+    );
+    if (normalizedRemoteMatches.length > 1) {
+      console.warn(
+        "[categories] duplicate categories detected for user+name:",
+        userId,
+        normalizedName,
+      );
+    }
+    const reusableRemote = normalizedRemoteMatches[0];
+    if (reusableRemote?.id) {
+      return reusableRemote.id;
+    }
+
     const { data, error } = await supabase
       .from("categories")
-      .insert({ user_id: userId, name })
+      .insert({ user_id: userId, name: trimmedName })
       .select("id")
       .single();
     if (error || !data) return null;
-
-    const style = mapCategoryStyle(name);
-    setCategories((prev) => [...prev, { id: data.id, name, ...style }]);
     return data.id;
   }
 
@@ -330,7 +487,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
   }
 
   const addItem = useCallback(
-    (item: Omit<SavedItem, "id" | "createdAt">) => {
+    async (item: Omit<SavedItem, "id" | "createdAt">) => {
       console.log("SavedItems addItem received payload:", item);
       console.log("SavedItems addItem mode:", isRemoteMode ? "supabase" : "local");
       const optimisticId = generateId();
@@ -338,69 +495,69 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
       setItems((prev) => [optimisticItem, ...prev]);
 
       if (isRemoteMode && authUserId) {
-        void (async () => {
-          try {
-            if (!user?.id) {
-              throw new Error("Authenticated user is missing. Cannot save item.");
-            }
-            const categoryId = (await upsertRemoteCategory(authUserId, item.category)) ||
-              categoryIdByName(item.category);
-            const normalizedCategoryId = isUuid(categoryId) ? categoryId : null;
-            const insertPayload = {
-              user_id: user.id,
-              url: item.url,
-              title: item.title,
-              thumbnail_url: item.thumbnailUrl ?? null,
-              category_id: normalizedCategoryId,
-              reminder_date: item.reminder ? new Date(item.reminder).toISOString() : null,
-            };
-            console.log("[SAVE DEBUG] profile.id:", profile?.id);
-            console.log("[SAVE DEBUG] auth user id:", user?.id);
-            console.log("[SAVE] user_id being sent:", insertPayload.user_id);
-            console.log("[SAVE FIXED] user_id:", user.id);
-            console.log("SavedItems Supabase insert payload:", insertPayload);
-            const { data, error } = await supabase
-              .from("saved_items")
-              .insert(insertPayload)
-              .select(
-                "id,user_id,url,title,thumbnail_url,category_id,reminder_date,created_at",
-              )
-              .single();
-            console.log("SavedItems Supabase insert result:", { data, error });
-
-            if (error || !data) {
-              throw new Error(error?.message || "Save failed. No row was returned.");
-            }
-
-            if (mountedRef.current) {
-              setItems((prev) =>
-                prev.map((saved) =>
-                  saved.id === optimisticId
-                    ? {
-                        ...saved,
-                        id: data.id,
-                        url: data.url ?? saved.url,
-                        title: data.title ?? saved.title,
-                        thumbnailUrl: data.thumbnail_url ?? saved.thumbnailUrl,
-                        createdAt: new Date(data.created_at).getTime(),
-                      }
-                    : saved,
-                ),
-              );
-            }
-          } catch (err) {
-            console.error("SavedItems Supabase insert failed:", err);
-            if (mountedRef.current) {
-              setItems((prev) => prev.filter((saved) => saved.id !== optimisticId));
-              Alert.alert(
-                "Could not save item",
-                err instanceof Error ? err.message : "Unknown error while saving item.",
-              );
-            }
+        try {
+          if (!user?.id) {
+            throw new Error("Authenticated user is missing. Cannot save item.");
           }
-        })();
+          const categoryId = (await upsertRemoteCategory(authUserId, item.category)) ||
+            categoryIdByName(item.category);
+          const normalizedCategoryId = isUuid(categoryId) ? categoryId : null;
+          const insertPayload = {
+            user_id: user.id,
+            url: item.url,
+            title: item.title,
+            thumbnail_url: item.thumbnailUrl ?? null,
+            category_id: normalizedCategoryId,
+            reminder_date: item.reminder ? new Date(item.reminder).toISOString() : null,
+          };
+          console.log("[SAVE DEBUG] profile.id:", profile?.id);
+          console.log("[SAVE DEBUG] auth user id:", user?.id);
+          console.log("[SAVE] user_id being sent:", insertPayload.user_id);
+          console.log("[SAVE FIXED] user_id:", user.id);
+          console.log("SavedItems Supabase insert payload:", insertPayload);
+          const { data, error } = await supabase
+            .from("saved_items")
+            .insert(insertPayload)
+            .select(
+              "id,user_id,url,title,thumbnail_url,category_id,reminder_date,created_at",
+            )
+            .single();
+          console.log("SavedItems Supabase insert result:", { data, error });
+
+          if (error || !data) {
+            throw new Error(error?.message || "Save failed. No row was returned.");
+          }
+
+          if (mountedRef.current) {
+            setItems((prev) =>
+              prev.map((saved) =>
+                saved.id === optimisticId
+                  ? {
+                      ...saved,
+                      id: data.id,
+                      url: data.url ?? saved.url,
+                      title: data.title ?? saved.title,
+                      thumbnailUrl: data.thumbnail_url ?? saved.thumbnailUrl,
+                      createdAt: new Date(data.created_at).getTime(),
+                    }
+                  : saved,
+              ),
+            );
+          }
+          return { ok: true };
+        } catch (err) {
+          console.error("SavedItems Supabase insert failed:", err);
+          if (mountedRef.current) {
+            setItems((prev) => prev.filter((saved) => saved.id !== optimisticId));
+          }
+          return {
+            ok: false,
+            reason: err instanceof Error ? err.message : "Unknown error while saving item.",
+          };
+        }
       } else {
         console.log("SavedItems local save result:", optimisticItem);
+        return { ok: true };
       }
     },
     [isRemoteMode, authUserId, user?.id, profile?.id, categories],
@@ -408,12 +565,32 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
   const deleteItem = useCallback(
     (id: string) => {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      if (isRemoteMode && authUserId) {
-        void supabase.from("saved_items").delete().eq("id", id).eq("user_id", authUserId);
+      if (isRemoteMode) {
+        void (async () => {
+          if (!user?.id) {
+            Alert.alert("Delete failed", "Authenticated user is missing. Please sign in again.");
+            return;
+          }
+          console.log("[DELETE] item id:", id);
+          console.log("[DELETE] user id:", user.id);
+          const { data, error } = await supabase
+            .from("saved_items")
+            .delete()
+            .eq("id", id)
+            .eq("user_id", user.id)
+            .select("id");
+          console.log("[DELETE] supabase result/error:", { data, error });
+          if (error) {
+            Alert.alert("Delete failed", error.message || "Could not delete saved item.");
+            return;
+          }
+          setItems((prev) => prev.filter((i) => i.id !== id));
+        })();
+        return;
       }
+      setItems((prev) => prev.filter((i) => i.id !== id));
     },
-    [isRemoteMode, authUserId],
+    [isRemoteMode, user?.id],
   );
 
   const updateItem = useCallback(
@@ -468,14 +645,12 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
       if (isRemoteMode && authUserId) {
         void (async () => {
-          const { data } = await supabase
-            .from("categories")
-            .insert({ user_id: authUserId, name: trimmedName })
-            .select("id")
-            .single();
-          if (data && mountedRef.current) {
+          const remoteId = await upsertRemoteCategory(authUserId, trimmedName);
+          if (remoteId && mountedRef.current) {
             setCategories((prev) =>
-              prev.map((cat) => (cat.id === newLocalId ? { ...cat, id: data.id } : cat)),
+              dedupeCategories(
+                prev.map((cat) => (cat.id === newLocalId ? { ...cat, id: remoteId } : cat)),
+              ),
             );
           }
         })();

@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   Animated,
   Image,
@@ -110,11 +110,16 @@ function ActionRow({
 
 function UpcomingBlock({
   title,
+  sectionKey,
   items,
   onOpenItem,
+  isExpanded,
+  onViewAll,
+  onCollapse,
   isLast = false,
 }: {
   title: string;
+  sectionKey: "tomorrow" | "week" | "month";
   items: Array<{
     id: string;
     title: string;
@@ -123,19 +128,31 @@ function UpcomingBlock({
     reminder?: number;
   }>;
   onOpenItem: (id: string) => void;
+  isExpanded: boolean;
+  onViewAll: () => void;
+  onCollapse: () => void;
   isLast?: boolean;
 }) {
+  const visibleItems = isExpanded ? items : items.slice(0, 4);
+
   return (
     <View style={[styles.upcomingBlock, !isLast && styles.actionRowBorder]}>
       <View style={styles.upcomingHeader}>
-        <Text style={styles.upcomingTitle}>{title}</Text>
+        <View>
+          <Text style={styles.upcomingTitle}>{title}</Text>
+          {isExpanded ? (
+            <Text style={styles.upcomingExpandedSubtitle}>
+              Showing all reminders
+            </Text>
+          ) : null}
+        </View>
         <Text style={styles.upcomingCount}>{items.length}</Text>
       </View>
 
       {items.length === 0 ? (
         <Text style={styles.upcomingEmpty}>Nothing here yet</Text>
       ) : (
-        items.slice(0, 4).map((item) => (
+        visibleItems.map((item) => (
           <Pressable
             key={item.id}
             onPress={() => onOpenItem(item.id)}
@@ -164,6 +181,32 @@ function UpcomingBlock({
           </Pressable>
         ))
       )}
+
+      {items.length > 4 && !isExpanded ? (
+        <Pressable
+          onPress={onViewAll}
+          style={({ pressed }) => [
+            styles.upcomingToggleButton,
+            pressed && styles.upcomingItemPressed,
+          ]}
+        >
+          <Text style={styles.upcomingToggleText}>View all ({items.length})</Text>
+          <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.70)" />
+        </Pressable>
+      ) : null}
+
+      {items.length > 4 && isExpanded ? (
+        <Pressable
+          onPress={onCollapse}
+          style={({ pressed }) => [
+            styles.upcomingToggleButton,
+            pressed && styles.upcomingItemPressed,
+          ]}
+        >
+          <Text style={styles.upcomingToggleText}>Show less</Text>
+          <Feather name="chevron-up" size={14} color="rgba(255,255,255,0.70)" />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -179,6 +222,9 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const { items } = useSavedItems();
   const { mode, profile, signOut } = useAuth();
+  const [expandedUpcomingSection, setExpandedUpcomingSection] = useState<
+    null | "tomorrow" | "week" | "month"
+  >(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 84 + 24 : insets.bottom + 90;
@@ -311,20 +357,32 @@ export default function MoreScreen() {
         <View style={styles.card}>
           <UpcomingBlock
             title="Tomorrow"
+            sectionKey="tomorrow"
             items={tomorrowItems}
             onOpenItem={openItem}
+            isExpanded={expandedUpcomingSection === "tomorrow"}
+            onViewAll={() => setExpandedUpcomingSection("tomorrow")}
+            onCollapse={() => setExpandedUpcomingSection(null)}
           />
 
           <UpcomingBlock
             title="This Week"
+            sectionKey="week"
             items={weekItems}
             onOpenItem={openItem}
+            isExpanded={expandedUpcomingSection === "week"}
+            onViewAll={() => setExpandedUpcomingSection("week")}
+            onCollapse={() => setExpandedUpcomingSection(null)}
           />
 
           <UpcomingBlock
             title="This Month"
+            sectionKey="month"
             items={monthItems}
             onOpenItem={openItem}
+            isExpanded={expandedUpcomingSection === "month"}
+            onViewAll={() => setExpandedUpcomingSection("month")}
+            onCollapse={() => setExpandedUpcomingSection(null)}
             isLast
           />
         </View>
@@ -518,6 +576,13 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.40)",
   },
 
+  upcomingExpandedSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.45)",
+  },
+
   upcomingEmpty: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
@@ -559,6 +624,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.38)",
     marginTop: 2,
+  },
+
+  upcomingToggleButton: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+
+  upcomingToggleText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.78)",
   },
 
   actionRow: {
