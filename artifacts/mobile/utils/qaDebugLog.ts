@@ -8,14 +8,29 @@ export type QaDebugEvent = {
 };
 
 const MAX_EVENTS = 100;
-const qaEvents: QaDebugEvent[] = [];
-const listeners = new Set<() => void>();
-const sequenceByCategory: Record<QaDebugCategory, number> = {
-  AUTH: 0,
-  SHARE: 0,
-  METADATA: 0,
-  SAVED: 0,
+type QaDebugStore = {
+  events: QaDebugEvent[];
+  listeners: Set<() => void>;
+  sequenceByCategory: Record<QaDebugCategory, number>;
 };
+
+const storeKey = "__vexoQaDebugStore";
+const globalStore = globalThis as typeof globalThis & {
+  [storeKey]?: QaDebugStore;
+};
+
+const qaStore: QaDebugStore =
+  globalStore[storeKey] ||
+  (globalStore[storeKey] = {
+    events: [],
+    listeners: new Set<() => void>(),
+    sequenceByCategory: {
+      AUTH: 0,
+      SHARE: 0,
+      METADATA: 0,
+      SAVED: 0,
+    },
+  });
 
 function safeStringify(data: unknown): string {
   if (data === undefined) return "";
@@ -34,12 +49,12 @@ function safeStringify(data: unknown): string {
 }
 
 function notify() {
-  listeners.forEach((listener) => listener());
+  qaStore.listeners.forEach((listener) => listener());
 }
 
 export function nextQaSequence(category: QaDebugCategory): number {
-  sequenceByCategory[category] += 1;
-  return sequenceByCategory[category];
+  qaStore.sequenceByCategory[category] += 1;
+  return qaStore.sequenceByCategory[category];
 }
 
 export function qaLog(
@@ -53,18 +68,23 @@ export function qaLog(
     message,
     data: data === undefined ? undefined : safeStringify(data),
   };
-  qaEvents.push(event);
-  if (qaEvents.length > MAX_EVENTS) {
-    qaEvents.splice(0, qaEvents.length - MAX_EVENTS);
+  qaStore.events.push(event);
+  if (qaStore.events.length > MAX_EVENTS) {
+    qaStore.events.splice(0, qaStore.events.length - MAX_EVENTS);
   }
   notify();
 }
 
 export function getQaLogs(): QaDebugEvent[] {
-  return [...qaEvents];
+  return qaStore.events;
+}
+
+export function clearQaLogs(): void {
+  qaStore.events.splice(0, qaStore.events.length);
+  notify();
 }
 
 export function subscribeQaLogs(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  qaStore.listeners.add(listener);
+  return () => qaStore.listeners.delete(listener);
 }
