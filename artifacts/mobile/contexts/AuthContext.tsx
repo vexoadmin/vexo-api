@@ -5,6 +5,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { type Session, type User } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
+import { qaLog } from "@/utils/qaDebugLog";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -311,8 +312,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         console.log("[AUTH DEBUG] getSession start");
+        qaLog("AUTH", "getSession start");
         const { data: sessionData } = await supabase.auth.getSession();
         console.log("[AUTH DEBUG] getSession result:", {
+          hasSession: !!sessionData.session,
+          userId: sessionData.session?.user?.id ?? null,
+          email: sessionData.session?.user?.email ?? null,
+        });
+        qaLog("AUTH", "getSession result", {
           hasSession: !!sessionData.session,
           userId: sessionData.session?.user?.id ?? null,
           email: sessionData.session?.user?.email ?? null,
@@ -322,6 +329,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (activeSession?.user) {
           setSession(activeSession);
           console.log("[AUTH DEBUG] user state set:", {
+            userId: activeSession.user.id,
+            email: activeSession.user.email ?? null,
+          });
+          qaLog("AUTH", "user set from getSession", {
             userId: activeSession.user.id,
             email: activeSession.user.email ?? null,
           });
@@ -341,6 +352,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setMode("authenticated");
         } else {
           console.log("[AUTH DEBUG] user state cleared (no active session)");
+          qaLog("AUTH", "user cleared (no active session)");
           setMode(null);
           setUser(null);
           setProfile(null);
@@ -349,6 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         console.log("[AUTH DEBUG] getSession threw error");
         console.log("[AUTH DEBUG] user state cleared (getSession error)");
+        qaLog("AUTH", "getSession error: user cleared");
         setMode(null);
         setUser(null);
         setProfile(null);
@@ -361,6 +374,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
       console.log("[AUTH DEBUG] onAuthStateChange:", {
+        event,
+        hasSession: !!nextSession,
+        userId: nextSession?.user?.id ?? null,
+        email: nextSession?.user?.email ?? null,
+      });
+      qaLog("AUTH", "onAuthStateChange event", {
         event,
         hasSession: !!nextSession,
         userId: nextSession?.user?.id ?? null,
@@ -384,6 +403,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userId: nextSession.user.id,
           email: nextSession.user.email ?? null,
         });
+        qaLog("AUTH", "user set from onAuthStateChange", {
+          userId: nextSession.user.id,
+          email: nextSession.user.email ?? null,
+        });
         setUser(nextSession.user);
         setProfile(nextProfile);
         setMode("authenticated");
@@ -391,6 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void ensureProfileRow(nextProfile);
       } else {
         console.log("[AUTH DEBUG] user state cleared (auth state change)");
+        qaLog("AUTH", "user cleared (auth state change)");
         setUser(null);
         setProfile(null);
         setMode(null);

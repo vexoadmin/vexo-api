@@ -26,6 +26,7 @@ import {
   getYoutubeThumbnail,
   VideoMetadata,
 } from "@/utils/videoMetadata";
+import { nextQaSequence, qaLog } from "@/utils/qaDebugLog";
 
 const BG = "#060814";
 const SURFACE = "#0B1020";
@@ -329,6 +330,7 @@ export default function AddScreen() {
 
   useEffect(() => {
     const normalizedCurrent = normalizeUrl(url);
+    qaLog("METADATA", "URL entered", { url: normalizedCurrent });
 
     if (normalizedCurrent !== prevUrlRef.current) {
       prevUrlRef.current = normalizedCurrent;
@@ -358,6 +360,13 @@ export default function AddScreen() {
     console.log("[METADATA DEBUG] before metadata fetch URL:", normalized);
     const currentRequestId = requestIdRef.current + 1;
     requestIdRef.current = currentRequestId;
+    const metadataSequence = nextQaSequence("METADATA");
+    const fetchStartedAt = Date.now();
+    qaLog("METADATA", "metadata fetch start", {
+      sequence: metadataSequence,
+      requestId: currentRequestId,
+      url: normalized,
+    });
 
     setMetaLoading(true);
     setPreviewImgError(false);
@@ -411,6 +420,15 @@ export default function AddScreen() {
       } catch {
         meta = {};
       }
+      const elapsedMs = Date.now() - fetchStartedAt;
+      qaLog("METADATA", "metadata fetch result", {
+        sequence: metadataSequence,
+        requestId: currentRequestId,
+        elapsedMs,
+        titleExists: !!meta.title?.trim(),
+        thumbnailExists: !!meta.thumbnailUrl,
+        fallbackImageExists: !!meta.fallbackImageUrl,
+      });
       console.log("[METADATA DEBUG] after metadata fetch result:", meta);
       console.log("AddScreen metadata returned:", {
         inputUrl: normalized,
@@ -606,6 +624,12 @@ export default function AddScreen() {
       fetchedMeta?.title?.trim() ||
       smartFallbackTitle(normalized, detectedPlatform);
     if (!title.trim() && !fetchedMeta?.title?.trim()) {
+      qaLog("METADATA", "fallback title used", {
+        reason: "manual title empty and fetched metadata title missing",
+        platform: detectedPlatform,
+        url: normalized,
+        fallbackTitle: finalTitle,
+      });
       console.log("[METADATA DEBUG] fallback title used:", {
         reason: "manual title empty and fetched metadata title missing",
         platform: detectedPlatform,
@@ -670,6 +694,11 @@ export default function AddScreen() {
     console.log("[METADATA DEBUG] before save:", {
       finalTitle,
       thumbnail_url: addPayload.thumbnailUrl,
+      url: addPayload.url,
+    });
+    qaLog("METADATA", "final title/thumbnail saved", {
+      finalTitle,
+      thumbnailUrl: addPayload.thumbnailUrl ?? null,
       url: addPayload.url,
     });
     console.log("AddScreen addItem payload:", addPayload);

@@ -9,6 +9,7 @@ import {
 } from "../utils/videoMetadata";
 import { useAuth } from "./AuthContext";
 import { supabase } from "@/lib/supabase";
+import { qaLog } from "@/utils/qaDebugLog";
 
 export interface SavedItem {
   id: string;
@@ -230,6 +231,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
   async function loadRemoteData(userId: string) {
     console.log("[SAVED DEBUG] loadRemoteData start:", { userId });
+    qaLog("SAVED", "loadRemoteData start", { userId });
     try {
       console.log("[LOAD] auth user id:", userId);
       console.log("[LOAD DEBUG] user_id used:", userId);
@@ -265,6 +267,12 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         savedItemsCount: itemRes.data?.length ?? 0,
         catResError: catRes.error ?? null,
         itemResError: itemRes.error ?? null,
+      });
+      qaLog("SAVED", "loadRemoteData query results", {
+        savedItemsCount: itemRes.data?.length ?? 0,
+        categoriesCount: catRes.data?.length ?? 0,
+        itemResError: itemRes.error?.message ?? null,
+        catResError: catRes.error?.message ?? null,
       });
 
       console.log("[LOAD] saved_items query error:", itemRes.error);
@@ -335,21 +343,33 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
       if (mountedRef.current) {
         console.log("SavedItems loadRemoteData mapped items:", remoteItems.slice(0, 5));
         console.log("[SAVED DEBUG] setting remote items with count:", remoteItems.length);
+        qaLog("SAVED", "setCategories count", { count: mergedCategories.length });
         setCategories(mergedCategories);
+        qaLog("SAVED", "setItems count", { count: remoteItems.length });
         setItems(remoteItems);
         setLoaded(true);
       }
       console.log("[SAVED DEBUG] loadRemoteData end");
+      qaLog("SAVED", "loadRemoteData end", {
+        savedItemsCount: remoteItems.length,
+        categoriesCount: mergedCategories.length,
+      });
     } catch (error) {
       console.log("[LOAD] saved_items query error:", error);
       // In authenticated mode, never fall back to potentially stale local user data.
       if (mountedRef.current) {
         console.log("[SAVED DEBUG] setItems empty called from loadRemoteData catch");
+        qaLog("SAVED", "setItems count", { count: 0, reason: "loadRemoteData catch" });
         setItems([]);
+        qaLog("SAVED", "setCategories count", {
+          count: DEFAULT_CATEGORIES.length,
+          reason: "loadRemoteData catch",
+        });
         setCategories(DEFAULT_CATEGORIES);
         setLoaded(true);
       }
       console.log("[SAVED DEBUG] loadRemoteData end");
+      qaLog("SAVED", "loadRemoteData end", { error: String(error) });
     }
   }
 
@@ -488,6 +508,10 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
 
   const addItem = useCallback(
     async (item: Omit<SavedItem, "id" | "createdAt">) => {
+      qaLog("SAVED", "save item start", {
+        category: item.category,
+        platform: item.platform,
+      });
       console.log("SavedItems addItem received payload:", item);
       console.log("SavedItems addItem mode:", isRemoteMode ? "supabase" : "local");
       const optimisticId = generateId();
@@ -544,12 +568,17 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
               ),
             );
           }
+          qaLog("SAVED", "save item success", { mode: "remote" });
           return { ok: true };
         } catch (err) {
           console.error("SavedItems Supabase insert failed:", err);
           if (mountedRef.current) {
             setItems((prev) => prev.filter((saved) => saved.id !== optimisticId));
           }
+          qaLog("SAVED", "save item error", {
+            mode: "remote",
+            reason: err instanceof Error ? err.message : "unknown",
+          });
           return {
             ok: false,
             reason: err instanceof Error ? err.message : "Unknown error while saving item.",
@@ -557,6 +586,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
         }
       } else {
         console.log("SavedItems local save result:", optimisticItem);
+        qaLog("SAVED", "save item success", { mode: "local" });
         return { ok: true };
       }
     },

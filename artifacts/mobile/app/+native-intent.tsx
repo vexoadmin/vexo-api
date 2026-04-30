@@ -1,3 +1,5 @@
+import { nextQaSequence, qaLog } from "@/utils/qaDebugLog";
+
 function decodePossiblyEncoded(value: string): string {
   try {
     return decodeURIComponent(value);
@@ -13,8 +15,12 @@ function extractFirstHttpUrl(text: string): string | undefined {
 }
 
 function mapIncomingToAddPath(rawPath: string): string {
+  const sequence = nextQaSequence("SHARE");
+  qaLog("SHARE", "+native-intent payload received", { sequence, rawPath });
+  console.log("[SHARE DEBUG] +native-intent payload received", { rawPath });
   console.log("[share] native intent input", rawPath);
   const decoded = decodePossiblyEncoded(rawPath).trim();
+  console.log("[SHARE DEBUG] +native-intent raw shared text/url", { decoded });
   const directFromLooseQuery = (() => {
     const match = decoded.match(/(?:[?&#]|^)(?:url|text)=([^&#]+)/i);
     if (!match?.[1]) return undefined;
@@ -23,6 +29,15 @@ function mapIncomingToAddPath(rawPath: string): string {
   })();
   if (directFromLooseQuery) {
     const mapped = `/add?url=${encodeURIComponent(directFromLooseQuery)}`;
+    qaLog("SHARE", "+native-intent extracted URL", {
+      sequence,
+      url: directFromLooseQuery,
+    });
+    qaLog("SHARE", "+native-intent navigating to /add", { sequence, mappedPath: mapped });
+    console.log("[SHARE DEBUG] +native-intent extracted URL", directFromLooseQuery);
+    console.log("[SHARE DEBUG] +native-intent navigating to /add", {
+      mappedPath: mapped,
+    });
     console.log("[share] extracted url", directFromLooseQuery);
     console.log("[share] mapped path", mapped);
     return mapped;
@@ -40,6 +55,12 @@ function mapIncomingToAddPath(rawPath: string): string {
   })();
   if (directFromQuery) {
     const mapped = `/add?url=${encodeURIComponent(directFromQuery)}`;
+    qaLog("SHARE", "+native-intent extracted URL", { sequence, url: directFromQuery });
+    qaLog("SHARE", "+native-intent navigating to /add", { sequence, mappedPath: mapped });
+    console.log("[SHARE DEBUG] +native-intent extracted URL", directFromQuery);
+    console.log("[SHARE DEBUG] +native-intent navigating to /add", {
+      mappedPath: mapped,
+    });
     console.log("[share] extracted url", directFromQuery);
     console.log("[share] mapped path", mapped);
     return mapped;
@@ -47,10 +68,23 @@ function mapIncomingToAddPath(rawPath: string): string {
   const directUrl = extractFirstHttpUrl(decoded);
   if (directUrl) {
     const mapped = `/add?url=${encodeURIComponent(directUrl)}`;
+    qaLog("SHARE", "+native-intent extracted URL", { sequence, url: directUrl });
+    qaLog("SHARE", "+native-intent navigating to /add", { sequence, mappedPath: mapped });
+    console.log("[SHARE DEBUG] +native-intent extracted URL", directUrl);
+    console.log("[SHARE DEBUG] +native-intent navigating to /add", {
+      mappedPath: mapped,
+    });
     console.log("[share] extracted url", directUrl);
     console.log("[share] mapped path", mapped);
     return mapped;
   }
+  console.log("[SHARE DEBUG] +native-intent navigation skipped: no URL extracted", {
+    rawPath,
+  });
+  qaLog("SHARE", "+native-intent navigation skipped", {
+    sequence,
+    reason: "no URL extracted",
+  });
   console.log("[share] mapped path", rawPath);
   return rawPath;
 }
@@ -63,6 +97,13 @@ function mapIncomingToAddPath(rawPath: string): string {
  * - iOS native Share Extension is intentionally out of scope for now.
  */
 export function redirectSystemPath({ path }: { path: string; initial: boolean }) {
-  if (!path) return path;
+  qaLog("SHARE", "+native-intent redirectSystemPath called", { hasPath: !!path });
+  console.log("[SHARE DEBUG] +native-intent redirectSystemPath called", {
+    hasPath: !!path,
+  });
+  if (!path) {
+    console.log("[SHARE DEBUG] +native-intent navigation skipped: empty path");
+    return path;
+  }
   return mapIncomingToAddPath(path);
 }
