@@ -7,7 +7,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useShareIntent } from "expo-share-intent";
-import { Stack, usePathname, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
 import { Linking } from "react-native";
@@ -25,30 +25,42 @@ import { nextQaSequence, qaLog } from "@/utils/qaDebugLog";
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+let shareDeepLinkListenerRegistered = false;
+let shareDeepLinkSubscription: { remove: () => void } | null = null;
 
 function RootLayoutNav() {
   const colors = useColors();
   const { mode, isHydrated, user } = useAuth();
   const hasUser = !!user;
   const router = useRouter();
-  const pathname = usePathname();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const lastHandledShareUrlRef = useRef<string | null>(null);
+  const isHydratedRef = useRef(isHydrated);
+  const modeRef = useRef(mode);
+  const routerRef = useRef(router);
+  const pendingDeepLinkRef = useRef<string | null>(null);
+  const deepLinkRunRef = useRef<(incoming: string | null) => void>(() => {});
+  const shareIntentPackRef = useRef({
+    hasShareIntent,
+    shareIntent,
+    resetShareIntent,
+  });
 
   useEffect(() => {
-    console.log("[SHARE DEBUG] share handlers initialized", {
+    isHydratedRef.current = isHydrated;
+    modeRef.current = mode;
+    routerRef.current = router;
+  }, [isHydrated, mode, router]);
+
+  useEffect(() => {
+    shareIntentPackRef.current = {
       hasShareIntent,
-      isHydrated,
-      mode,
-      pathname,
-    });
-    qaLog("SHARE", "share handlers initialized", {
-      hasShareIntent,
-      isHydrated,
-      mode,
-      pathname,
-    });
-  }, [hasShareIntent, isHydrated, mode, pathname]);
+      shareIntent,
+      resetShareIntent,
+    };
+  }, [hasShareIntent, shareIntent, resetShareIntent]);
+
+  const shareIntentFingerprint = `${shareIntent?.text ?? ""}\u001f${shareIntent?.webUrl ?? ""}`;
 
   useEffect(() => {
     console.log("[AUTH DEBUG] layout auth state:", {
@@ -66,23 +78,10 @@ function RootLayoutNav() {
   }, [isHydrated, mode, user?.id]);
 
   useEffect(() => {
-    if (!isHydrated || mode === null) {
-      console.log("[SHARE DEBUG] deep link listener skipped", {
-        reason: !isHydrated ? "not hydrated" : "mode is null",
-        isHydrated,
-        mode,
-      });
-      qaLog("SHARE", "deep link listener skipped", {
-        reason: !isHydrated ? "not hydrated" : "mode is null",
-      });
+    if (shareDeepLinkListenerRegistered) {
       return;
     }
-    console.log("[SHARE DEBUG] deep link listener initialized", {
-      isHydrated,
-      mode,
-      pathname,
-    });
-
+    shareDeepLinkListenerRegistered = true;
     const decodePossiblyEncoded = (value: string): string => {
       try {
         return decodeURIComponent(value);
@@ -123,16 +122,42 @@ function RootLayoutNav() {
     };
 
     const routeToAddFromIncoming = (incoming: string | null) => {
+      const hydrated = isHydratedRef.current;
+      const modeVal = modeRef.current;
+      const router = routerRef.current;
+
+      if (!hydrated || modeVal === null) {
+        if (incoming) {
+          const lower = incoming.toLowerCase();
+          if (!lower.startsWith("vexo://auth")) {
+            pendingDeepLinkRef.current = incoming;
+            qaLog("SHARE", "deep link route deferred", {
+              reason: !hydrated ? "not hydrated" : "mode is null",
+            });
+            console.log("[SHARE DEBUG] deep link route deferred", {
+              reason: !hydrated ? "not hydrated" : "mode is null",
+            });
+          }
+        }
+        return;
+      }
+
       if (!incoming) {
-        qaLog("SHARE", "navigation skipped", { reason: "incoming is empty" });
-        console.log("[SHARE DEBUG] navigation skipped: incoming is empty");
         return;
       }
 
       let candidate: string | undefined;
       const trimmed = incoming.trim();
+      if (trimmed.toLowerCase().startsWith("vexo://auth")) {
+        return;
+      }
+
       const sequence = nextQaSequence("SHARE");
-      qaLog("SHARE", "payload received", { sequence, incoming: trimmed });
+      qaLog("SHARE", "share payload received", {
+        sequence,
+        source: "linking",
+        length: trimmed.length,
+      });
       console.log("[SHARE DEBUG] share payload received", { incoming: trimmed });
 
       console.log("[share] native intent input", trimmed);
@@ -175,61 +200,42 @@ function RootLayoutNav() {
         url: candidate,
       });
 
-      router.replace({
+      router.push({
         pathname: "/add",
         params: { url: candidate },
       });
     };
 
-    Linking.getInitialURL()
+    deepLinkRunRef.current = routeToAddFromIncoming;
+
+    qaLog("SHARE", "listener added", {});
+    console.log("[SHARE DEBUG] deep link listener attached (once, app lifecycle)");
+    void Linking.getInitialURL()
       .then((initialUrl) => {
-        qaLog("SHARE", "initial URL received", { initialUrl });
         console.log("[SHARE DEBUG] Linking.getInitialURL result", { initialUrl });
         console.log("[share] layout initial url", initialUrl);
-        routeToAddFromIncoming(initialUrl);
+        deepLinkRunRef.current(initialUrl);
       })
       .catch(() => undefined);
 
-    const sub = Linking.addEventListener("url", ({ url }) => {
-      qaLog("SHARE", "linking url event", { url });
+    shareDeepLinkSubscription = Linking.addEventListener("url", ({ url }) => {
       console.log("[SHARE DEBUG] Linking url event received", { url });
       console.log("[share] layout initial url", url);
-      routeToAddFromIncoming(url);
+      deepLinkRunRef.current(url);
     });
 
-    return () => {
-      console.log("[SHARE DEBUG] deep link listener removed");
-      qaLog("SHARE", "deep link listener removed");
-      sub.remove();
-    };
-  }, [isHydrated, mode, pathname, router]);
+  }, []);
 
   useEffect(() => {
-    if (!isHydrated || mode === null || !hasShareIntent) {
-      console.log("[SHARE DEBUG] share intent effect skipped", {
-        reason: !isHydrated
-          ? "not hydrated"
-          : mode === null
-            ? "mode is null"
-            : "hasShareIntent is false",
-        isHydrated,
-        mode,
-        hasShareIntent,
-      });
-      qaLog("SHARE", "share intent effect skipped", {
-        reason: !isHydrated
-          ? "not hydrated"
-          : mode === null
-            ? "mode is null"
-            : "hasShareIntent is false",
-      });
-      return;
-    }
-    console.log("[SHARE DEBUG] share intent effect initialized", {
-      hasShareIntent,
-      isHydrated,
-      mode,
-    });
+    if (!isHydrated || mode === null) return;
+    const pending = pendingDeepLinkRef.current;
+    if (!pending) return;
+    pendingDeepLinkRef.current = null;
+    deepLinkRunRef.current(pending);
+  }, [isHydrated, mode]);
+
+  useEffect(() => {
+    if (!hasShareIntent || !isHydrated || mode === null) return;
 
     const extractFirstHttpUrl = (text: string): string | undefined => {
       const match = text.match(/https?:\/\/[^\s<>"')\]}]+/i);
@@ -237,10 +243,11 @@ function RootLayoutNav() {
       return match[0].replace(/[),.;!?]+$/, "");
     };
 
-    const sharedText = (shareIntent?.text || "").trim();
-    const sharedWebUrl = (shareIntent?.webUrl || "").trim();
+    const pack = shareIntentPackRef.current;
+    const sharedText = (pack.shareIntent?.text || "").trim();
+    const sharedWebUrl = (pack.shareIntent?.webUrl || "").trim();
     const sequence = nextQaSequence("SHARE");
-    qaLog("SHARE", "payload received", {
+    qaLog("SHARE", "share payload received", {
       sequence,
       shareText: sharedText,
       shareWebUrl: sharedWebUrl,
@@ -249,6 +256,7 @@ function RootLayoutNav() {
       shareText: sharedText,
       shareWebUrl: sharedWebUrl,
     });
+
     const candidate =
       (/^https?:\/\//i.test(sharedWebUrl) ? sharedWebUrl : undefined) ||
       extractFirstHttpUrl(sharedText) ||
@@ -277,26 +285,28 @@ function RootLayoutNav() {
 
     qaLog("SHARE", "extracted URL", { sequence, url: candidate });
     console.log("[SHARE DEBUG] extracted URL", candidate);
-    console.log("[share-intent] received payload", shareIntent);
+    console.log("[share-intent] received payload", pack.shareIntent);
     console.log("[share-intent] extracted url", candidate);
-    console.log("[SHARE DEBUG] navigating to /add", {
-      pathname: "/add",
-      url: candidate,
-    });
+
     qaLog("SHARE", "navigating to /add", {
       sequence,
       pathname: "/add",
       url: candidate,
     });
+    console.log("[SHARE DEBUG] navigating to /add", {
+      pathname: "/add",
+      url: candidate,
+    });
 
-    router.replace({
+    routerRef.current.push({
       pathname: "/add",
       params: { url: candidate },
     });
+
+    qaLog("SHARE", "intent cleared", { sequence });
     console.log("[SHARE DEBUG] share intent consumed/reset");
-    qaLog("SHARE", "share intent cleared/reset", { sequence });
-    resetShareIntent(true);
-  }, [isHydrated, mode, hasShareIntent, shareIntent, resetShareIntent, router]);
+    pack.resetShareIntent(true);
+  }, [isHydrated, mode, hasShareIntent, shareIntentFingerprint]);
 
   console.log("[AUTH DEBUG] layout navigation decision:", {
     isHydrated,

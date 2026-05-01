@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Alert } from "react-native";
 
 import {
+  detectPlatform,
   extractYoutubeId,
   fetchVideoMetadata,
   getYoutubeThumbnail,
@@ -323,7 +324,7 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
           id: item.id,
           url: item.url,
           title: item.title || item.url || "Saved link",
-          platform: "website",
+          platform: detectPlatform(item.url) ?? "website",
           category:
             item.categories?.name ||
             categoryNameById.get(item.category_id) ||

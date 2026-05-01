@@ -86,7 +86,7 @@ function fallbackTitle(url: string, platform: string): string {
   }
 }
 
-function detectPlatform(url: string): string {
+export function detectPlatform(url: string): string {
   const lower = url.toLowerCase();
   if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
   if (lower.includes("tiktok.com")) return "tiktok";

@@ -67,14 +67,6 @@ export function AuthScreenContent({
     void Linking.getInitialURL().then((url) => {
       handleAuthDeepLink(url);
     });
-
-    const sub = Linking.addEventListener("url", ({ url }) => {
-      handleAuthDeepLink(url);
-    });
-
-    return () => {
-      sub.remove();
-    };
   }, []);
 
   async function handleGoogleLogin() {

@@ -49,6 +49,9 @@ const GUEST_KEY = "@vexo_guest_mode_v1";
 const AuthContext = createContext<AuthContextValue | null>(null);
 const GOOGLE_CONFLICT_MESSAGE =
   "This email may already be registered with email and password. Please sign in with email/password, or reset your password.";
+let authDeepLinkListenerRegistered = false;
+let authDeepLinkInitialUrlHandled = false;
+let authDeepLinkSubscription: { remove: () => void } | null = null;
 
 function parseHashParams(url: string): Record<string, string> {
   const hashIndex = url.indexOf("#");
@@ -428,8 +431,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (authDeepLinkListenerRegistered) {
+      return;
+    }
+    authDeepLinkListenerRegistered = true;
+    console.log("[AUTH DEBUG] deep link listener added");
     const handleIncomingUrl = async (url: string) => {
-      console.log("[AUTH DEBUG] handleIncomingUrl received:", url);
+      console.log("[AUTH DEBUG] deep link received", {
+        length: url?.length ?? 0,
+        isVexoAuth: url.toLowerCase().startsWith("vexo://auth"),
+      });
       const lowerUrl = url.toLowerCase();
       if (!lowerUrl.startsWith("vexo://auth")) return;
       if (lowerUrl.startsWith("vexo://auth/reset-password")) {
@@ -442,28 +453,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       try {
         await finalizeSessionFromUrl(url);
+        console.log("[AUTH DEBUG] auth callback handled");
       } catch (error) {
         console.log("[AUTH GOOGLE] callback finalize exception:", error);
       }
     };
 
-    const sub = Linking.addEventListener("url", (event) => {
+    authDeepLinkSubscription = Linking.addEventListener("url", (event) => {
       console.log("[GOOGLE DEBUG] Linking url event:", event.url);
       console.log("[AUTH DEBUG] Linking url event:", event.url);
       void handleIncomingUrl(event.url);
     });
 
-    void Linking.getInitialURL().then((initialUrl) => {
-      console.log("[GOOGLE DEBUG] initial URL:", initialUrl);
-      console.log("[AUTH DEBUG] initial URL:", initialUrl);
-      if (initialUrl) {
-        void handleIncomingUrl(initialUrl);
-      }
-    });
+    if (!authDeepLinkInitialUrlHandled) {
+      authDeepLinkInitialUrlHandled = true;
+      void Linking.getInitialURL().then((initialUrl) => {
+        console.log("[GOOGLE DEBUG] initial URL:", initialUrl);
+        console.log("[AUTH DEBUG] initial URL:", initialUrl);
+        if (initialUrl) {
+          void handleIncomingUrl(initialUrl);
+        }
+      });
+    }
 
-    return () => {
-      sub.remove();
-    };
   }, []);
 
   async function signInWithGoogle(): Promise<AuthActionResult> {

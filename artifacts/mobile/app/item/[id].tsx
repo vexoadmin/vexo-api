@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Alert,
   Image,
@@ -198,12 +199,17 @@ export default function ItemScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      <ScrollView
+      <KeyboardAwareScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 28 },
         ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        enableOnAndroid={true}
+        extraScrollHeight={120}
+        extraHeight={120}
       >
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
@@ -470,7 +476,7 @@ export default function ItemScreen() {
             <Text style={styles.actionText}>Open original</Text>
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {showDatePicker && Platform.OS !== "web" ? (
         <DateTimePicker
