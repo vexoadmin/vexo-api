@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Monorepo: ignore stray root app.json (Expo lives under artifacts/mobile)
+/app.json

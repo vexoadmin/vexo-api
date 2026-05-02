@@ -1,6 +1,16 @@
+import * as ExpoClipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -15,15 +25,82 @@ const BG = "#060814";
 const SURFACE = "#0B1020";
 const BORDER = "rgba(255,255,255,0.10)";
 
+const REDACT_KEYS = new Set([
+  "access_token",
+  "refresh_token",
+  "token",
+  "authorization",
+  "password",
+]);
+
+function redactUnknown(input: unknown): unknown {
+  if (input === null || input === undefined) return input;
+  if (Array.isArray(input)) return input.map(redactUnknown);
+  if (typeof input === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      if (REDACT_KEYS.has(k.toLowerCase())) {
+        out[k] = "[REDACTED]";
+      } else {
+        out[k] = redactUnknown(v);
+      }
+    }
+    return out;
+  }
+  return input;
+}
+
+function redactLogDataString(raw: string): string {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return JSON.stringify(redactUnknown(parsed), null, 2);
+  } catch {
+    return raw.replace(
+      /"(access_token|refresh_token|token|authorization|password)"\s*:\s*"[^"]*"/gi,
+      '"$1":"[REDACTED]"',
+    );
+  }
+}
+
+function buildSerializedLogsNewestFirst(): string {
+  const chronological = getQaLogs();
+  const newestFirst = [...chronological].reverse();
+  return newestFirst
+    .map((ev) => {
+      const dataBlock = ev.data
+        ? `\nData: ${redactLogDataString(ev.data)}`
+        : "";
+      return `[${ev.category}] ${ev.timestamp}\n${ev.message}${dataBlock}`;
+    })
+    .join("\n\n---\n\n");
+}
+
+async function copySerializedLogs(text: string): Promise<boolean> {
+  try {
+    if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    await ExpoClipboard.setStringAsync(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function shareSerializedLogs(text: string): Promise<void> {
+  await Share.share({ message: text });
+}
+
 export default function QaDebugScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [logs, setLogs] = useState<QaDebugEvent[]>([]);
 
-  function refreshLogs() {
+  const refreshLogs = useCallback(() => {
     const latest = getQaLogs();
     setLogs([...latest].reverse());
-  }
+  }, []);
 
   useEffect(() => {
     refreshLogs();
@@ -64,6 +141,39 @@ export default function QaDebugScreen() {
           style={[styles.controlBtn, styles.clearBtn]}
         >
           <Text style={styles.controlText}>Clear logs</Text>
+        </Pressable>
+      </View>
+      {/* TODO: remove Copy logs / Share logs before production */}
+      <View style={styles.controlsRow}>
+        <Pressable
+          onPress={async () => {
+            const text = buildSerializedLogsNewestFirst();
+            const ok = await copySerializedLogs(text);
+            if (ok) {
+              Alert.alert("Copied", "QA logs copied to clipboard.");
+            } else {
+              Alert.alert(
+                "Copy unavailable",
+                "Use “Share logs” to export logs from this device.",
+              );
+            }
+          }}
+          style={[styles.controlBtn, styles.copyBtn]}
+        >
+          <Text style={styles.controlText}>Copy logs</Text>
+        </Pressable>
+        <Pressable
+          onPress={async () => {
+            const text = buildSerializedLogsNewestFirst();
+            try {
+              await shareSerializedLogs(text);
+            } catch {
+              Alert.alert("Share failed", "Could not open the share sheet.");
+            }
+          }}
+          style={[styles.controlBtn, styles.shareBtn]}
+        >
+          <Text style={styles.controlText}>Share logs</Text>
         </Pressable>
       </View>
 
@@ -115,6 +225,7 @@ const styles = StyleSheet.create({
   },
   controlsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: 10,
   },
@@ -129,6 +240,8 @@ const styles = StyleSheet.create({
   refreshBtn: {},
   testBtn: { backgroundColor: "rgba(52,211,153,0.15)" },
   clearBtn: { backgroundColor: "rgba(248,113,113,0.12)" },
+  copyBtn: { backgroundColor: "rgba(96,165,250,0.12)" },
+  shareBtn: { backgroundColor: "rgba(167,139,250,0.12)" },
   controlText: {
     color: "rgba(255,255,255,0.9)",
     fontSize: 12,
