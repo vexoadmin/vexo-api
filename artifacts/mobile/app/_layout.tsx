@@ -20,6 +20,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SavedItemsProvider } from "@/contexts/SavedItemsContext";
 import { useColors } from "@/hooks/useColors";
+import { normalizeAuthHashToQueryForParse } from "@/utils/authDeepLinkUrl";
 import { nextQaSequence, qaLog } from "@/utils/qaDebugLog";
 
 SplashScreen.preventAutoHideAsync();
@@ -106,7 +107,7 @@ function RootLayoutNav() {
 
     const extractUrlFromVexoAddLink = (incoming: string): string | undefined => {
       try {
-        const parsed = new URL(incoming);
+        const parsed = new URL(normalizeAuthHashToQueryForParse(incoming));
         const queryUrl = parsed.searchParams.get("url") || parsed.searchParams.get("text");
         if (queryUrl) {
           const decoded = decodePossiblyEncoded(queryUrl).trim();
@@ -125,6 +126,10 @@ function RootLayoutNav() {
       const hydrated = isHydratedRef.current;
       const modeVal = modeRef.current;
       const router = routerRef.current;
+
+      if (!hydrated) {
+        qaLog("AUTH", "navigation blocked - not hydrated");
+      }
 
       if (!hydrated || modeVal === null) {
         if (incoming) {
@@ -147,7 +152,7 @@ function RootLayoutNav() {
       }
 
       let candidate: string | undefined;
-      const trimmed = incoming.trim();
+      const trimmed = normalizeAuthHashToQueryForParse(incoming.trim());
       if (trimmed.toLowerCase().startsWith("vexo://auth")) {
         return;
       }
@@ -308,6 +313,11 @@ function RootLayoutNav() {
     pack.resetShareIntent(true);
   }, [isHydrated, mode, hasShareIntent, shareIntentFingerprint]);
 
+  if (!isHydrated) {
+    console.log("[AUTH DEBUG] navigation blocked until hydration complete");
+    return null;
+  }
+
   console.log("[AUTH DEBUG] layout navigation decision:", {
     isHydrated,
     hasUser,
@@ -318,10 +328,6 @@ function RootLayoutNav() {
     hasUser,
     mode,
   });
-  if (!isHydrated) {
-    console.log("[AUTH DEBUG] navigation blocked until hydration complete");
-    return null;
-  }
   if (!hasUser) return <AuthScreenContent />;
 
   return (

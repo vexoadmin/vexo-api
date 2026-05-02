@@ -25,6 +25,8 @@ export interface SavedItem {
   reminder?: number;
 }
 
+type SavedItemPlatform = SavedItem["platform"];
+
 export interface Category {
   id: string;
   name: string;
@@ -320,23 +322,26 @@ export function SavedItemsProvider({ children }: { children: React.ReactNode }) 
       const categoryNameById = new Map(mergedCategories.map((c) => [c.id, c.name]));
 
       const remoteItems: SavedItem[] = (itemRes.data || [])
-        .map((item: any) => ({
-          id: item.id,
-          url: item.url,
-          title: item.title || item.url || "Saved link",
-          platform: detectPlatform(item.url) ?? "website",
-          category:
-            item.categories?.name ||
-            categoryNameById.get(item.category_id) ||
-            "Uncategorized",
-          notes: "",
-          thumbnailColor: "#8B5CF6",
-          thumbnailUrl: item.thumbnail_url || undefined,
-          createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
-          reminder: item.reminder_date
-            ? new Date(item.reminder_date).getTime()
-            : undefined,
-        }));
+        .map((item: any) => {
+          const detectedPlatform = detectPlatform(item.url) as SavedItemPlatform | null;
+          return {
+            id: item.id,
+            url: item.url,
+            title: item.title || item.url || "Saved link",
+            platform: detectedPlatform ?? "website",
+            category:
+              item.categories?.name ||
+              categoryNameById.get(item.category_id) ||
+              "Uncategorized",
+            notes: "",
+            thumbnailColor: "#8B5CF6",
+            thumbnailUrl: item.thumbnail_url || undefined,
+            createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+            reminder: item.reminder_date
+              ? new Date(item.reminder_date).getTime()
+              : undefined,
+          };
+        });
       console.log("[SAVED DEBUG] remoteItems length before setItems:", remoteItems.length);
       console.log("[LOAD] mapped items count:", remoteItems.length);
       console.log("[LOAD] final state items count before setItems:", remoteItems.length);

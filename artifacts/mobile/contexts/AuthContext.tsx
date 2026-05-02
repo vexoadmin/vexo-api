@@ -5,6 +5,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { type Session, type User } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
+import { normalizeAuthHashToQueryForParse } from "@/utils/authDeepLinkUrl";
 import { qaLog } from "@/utils/qaDebugLog";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -186,10 +187,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const userRef = useRef<User | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   async function setSessionFromResetUrl(url: string): Promise<void> {
-    const queryParams = parseQueryParams(url);
-    const { accessToken, refreshToken } = parseAuthTokens(url, queryParams);
+    const normalized = normalizeAuthHashToQueryForParse(url);
+    const queryParams = parseQueryParams(normalized);
+    const { accessToken, refreshToken } = parseAuthTokens(normalized, queryParams);
     if (!accessToken || !refreshToken) return;
     await supabase.auth.setSession({
       access_token: accessToken,
@@ -197,7 +204,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }
 
-  async function finalizeSessionFromUrl(url: string): Promise<AuthActionResult> {
+  async function finalizeSessionFromUrl(rawUrl: string): Promise<AuthActionResult> {
+    const url = normalizeAuthHashToQueryForParse(rawUrl);
     const lowerUrl = url.toLowerCase();
     const isAuthCallback = lowerUrl.startsWith("vexo://auth");
     console.log("[GOOGLE DEBUG] finalizeSessionFromUrl received url:", url);
@@ -212,7 +220,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const queryParams = parseQueryParams(url);
+    const tokenFromQuery = parseAuthTokens(url, queryParams);
     const code = queryParams["code"];
+    qaLog("AUTH", "auth callback parsed", {
+      hasAccessToken: !!(tokenFromQuery.accessToken || queryParams["access_token"]),
+      hasCode: !!code,
+    });
     console.log("[GOOGLE DEBUG] finalizeSessionFromUrl parsed code exists:", !!code);
     console.log("OAuth handler parsed code:", code ?? null);
     if (code) {
@@ -330,6 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const activeSession = sessionData.session;
         if (activeSession?.user) {
+          userRef.current = activeSession.user;
           setSession(activeSession);
           console.log("[AUTH DEBUG] user state set:", {
             userId: activeSession.user.id,
@@ -353,22 +367,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               | undefined,
           });
           setMode("authenticated");
-        } else {
+        } else if (!userRef.current) {
           console.log("[AUTH DEBUG] user state cleared (no active session)");
           qaLog("AUTH", "user cleared (no active session)");
+          userRef.current = null;
           setMode(null);
           setUser(null);
           setProfile(null);
           setSession(null);
+        } else {
+          qaLog("AUTH", "session preserved", { hasUser: true });
         }
       } catch {
         console.log("[AUTH DEBUG] getSession threw error");
-        console.log("[AUTH DEBUG] user state cleared (getSession error)");
-        qaLog("AUTH", "getSession error: user cleared");
-        setMode(null);
-        setUser(null);
-        setProfile(null);
-        setSession(null);
+        if (!userRef.current) {
+          console.log("[AUTH DEBUG] user state cleared (getSession error)");
+          qaLog("AUTH", "getSession error: user cleared");
+          userRef.current = null;
+          setMode(null);
+          setUser(null);
+          setProfile(null);
+          setSession(null);
+        } else {
+          qaLog("AUTH", "session preserved", { hasUser: true });
+        }
       } finally {
         setIsHydrated(true);
         console.log("[AUTH DEBUG] auth loading false (isHydrated=true)");
@@ -388,8 +410,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: nextSession?.user?.id ?? null,
         email: nextSession?.user?.email ?? null,
       });
-      setSession(nextSession);
+
+      if (event === "SIGNED_OUT") {
+        console.log("[AUTH DEBUG] user state cleared (SIGNED_OUT)");
+        qaLog("AUTH", "user cleared (SIGNED_OUT)");
+        userRef.current = null;
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setMode(null);
+        return;
+      }
+
       if (nextSession?.user) {
+        userRef.current = nextSession.user;
+        setSession(nextSession);
         const nextProfile: AuthUser = {
           id: nextSession.user.id,
           email: nextSession.user.email ?? "",
@@ -415,14 +450,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setMode("authenticated");
         void AsyncStorage.setItem(GUEST_KEY, "0");
         void ensureProfileRow(nextProfile);
-      } else {
-        console.log("[AUTH DEBUG] user state cleared (auth state change)");
-        qaLog("AUTH", "user cleared (auth state change)");
-        setUser(null);
-        setProfile(null);
-        setMode(null);
-        setSession(null);
+        qaLog("AUTH", "session preserved", { hasUser: true });
+        return;
       }
+
+      // Spurious null session (e.g. transient events): do not clear signed-in user.
     });
 
     return () => {
@@ -681,6 +713,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    userRef.current = null;
     setMode(null);
     setUser(null);
     setProfile(null);

@@ -1,3 +1,4 @@
+import { normalizeAuthHashToQueryForParse } from "@/utils/authDeepLinkUrl";
 import { nextQaSequence, qaLog } from "@/utils/qaDebugLog";
 
 function decodePossiblyEncoded(value: string): string {
@@ -44,7 +45,10 @@ function mapIncomingToAddPath(rawPath: string): string {
   }
   const directFromQuery = (() => {
     try {
-      const parsed = new URL(decoded.startsWith("vexo://") ? decoded : `vexo://${decoded.replace(/^\//, "")}`);
+      const forParse = normalizeAuthHashToQueryForParse(
+        decoded.startsWith("vexo://") ? decoded : `vexo://${decoded.replace(/^\//, "")}`,
+      );
+      const parsed = new URL(forParse);
       const queryUrl = parsed.searchParams.get("url") || parsed.searchParams.get("text");
       if (!queryUrl) return undefined;
       const normalized = decodePossiblyEncoded(queryUrl).trim();
