@@ -36,7 +36,7 @@
           ]
         }
       ],
-      "package": "com.anonymous.mobile"
+      "package": "com.vexoapps.app"
     },
     "web": {
       "favicon": "./assets/images/vexo-app-icon.png"

@@ -15,6 +15,15 @@ function extractFirstHttpUrl(text: string): string | undefined {
   return match[0].replace(/[),.;!?]+$/, "");
 }
 
+/** Google OAuth deep link — must not be rewritten to /add (AuthContext handles it via Linking). */
+function isGoogleOAuthAuthCallbackPath(decoded: string): boolean {
+  const tl = decoded.toLowerCase();
+  if (tl.startsWith("vexo://auth") || tl.startsWith("vexo:///auth")) return true;
+  if (tl.includes("/auth#access_token")) return true;
+  if (tl.includes("/auth?code=") || tl.includes("auth?code=")) return true;
+  return false;
+}
+
 function mapIncomingToAddPath(rawPath: string): string {
   const sequence = nextQaSequence("SHARE");
   qaLog("SHARE", "+native-intent payload received", { sequence, rawPath });
@@ -107,6 +116,17 @@ export function redirectSystemPath({ path }: { path: string; initial: boolean })
   });
   if (!path) {
     console.log("[SHARE DEBUG] +native-intent navigation skipped: empty path");
+    return path;
+  }
+  const decodedPath = decodePossiblyEncoded(path).trim();
+  if (isGoogleOAuthAuthCallbackPath(decodedPath)) {
+    const lower = decodedPath.toLowerCase();
+    const hasAccessToken = lower.includes("access_token");
+    const hasCode = /(?:[?#&])code=/.test(decodedPath);
+    qaLog("AUTH", "+native-intent auth callback passthrough", {
+      hasAccessToken,
+      hasCode,
+    });
     return path;
   }
   return mapIncomingToAddPath(path);
