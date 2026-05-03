@@ -505,6 +505,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   }, []);
 
+  async function waitForSessionAfterOAuth(timeoutMs = 20000): Promise<boolean> {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const { data } = await supabase.auth.getSession();
+      const hasSession = !!data.session?.user;
+      qaLog("AUTH", "oauth wait session tick", { hasSession });
+      if (hasSession) {
+        qaLog("AUTH", "oauth wait session resolved", { hasSession: true });
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    qaLog("AUTH", "oauth wait session resolved", { hasSession: false });
+    return false;
+  }
+
   async function signInWithGoogle(): Promise<AuthActionResult> {
     setIsAuthenticating(true);
     try {
@@ -560,21 +576,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       qaLog("AUTH", "oauth browser returned without callback - checking session", {
         type: browserResult.type,
       });
-      const { data: postBrowserSession } = await supabase.auth.getSession();
-      const recovered = !!postBrowserSession.session?.user;
-      qaLog("AUTH", "oauth session recovered after browser result", { hasSession: recovered });
+      const recovered = await waitForSessionAfterOAuth(20000);
       if (recovered) {
-        await AsyncStorage.setItem(GUEST_KEY, "0");
-
+        const { data: postBrowserSession } = await supabase.auth.getSession();
         const session = postBrowserSession.session;
         if (session?.user) {
           setSession(session);
           setUser(session.user);
-
           userRef.current = session.user;
           setMode("authenticated");
-
-          const nextProfile = {
+          const nextProfile: AuthUser = {
             id: session.user.id,
             email: session.user.email ?? "",
             name:
@@ -584,10 +595,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               "Vexo User",
             avatarUrl: session.user.user_metadata?.avatar_url as string | undefined,
           };
-
           setProfile(nextProfile);
         }
-
+        await AsyncStorage.setItem(GUEST_KEY, "0");
         return { ok: true };
       }
 
