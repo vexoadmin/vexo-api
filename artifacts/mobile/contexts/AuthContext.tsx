@@ -50,6 +50,8 @@ const GUEST_KEY = "@vexo_guest_mode_v1";
 const AuthContext = createContext<AuthContextValue | null>(null);
 const GOOGLE_CONFLICT_MESSAGE =
   "This email may already be registered with email and password. Please sign in with email/password, or reset your password.";
+const GOOGLE_SIGNIN_INCOMPLETE =
+  "Google sign-in could not be completed. Please try again.";
 let authDeepLinkListenerRegistered = false;
 let authDeepLinkInitialUrlHandled = false;
 let authDeepLinkSubscription: { remove: () => void } | null = null;
@@ -128,20 +130,19 @@ function isGoogleIdentityConflictError(error: unknown): boolean {
   const message = String(record["message"] || "").toLowerCase();
   const text = `${code} ${message}`;
   return (
-    text.includes("identity") && text.includes("already") ||
-    text.includes("already registered") ||
-    text.includes("already exists") ||
+    (text.includes("identity") && text.includes("already")) ||
+    text.includes("identity_already_exists") ||
     text.includes("email_exists") ||
-    text.includes("account exists")
+    text.includes("account exists") ||
+    text.includes("account_exists") ||
+    text.includes("already registered")
   );
 }
 
 function normalizeGoogleAuthErrorReason(error: unknown, fallback?: string): string {
   if (isGoogleIdentityConflictError(error)) return GOOGLE_CONFLICT_MESSAGE;
-  const record = (error || {}) as Record<string, unknown>;
-  const message = typeof record["message"] === "string" ? record["message"] : "";
-  if (message.toLowerCase().includes("oauth")) return GOOGLE_CONFLICT_MESSAGE;
-  return fallback || message || "Google sign-in failed. Try again.";
+  if (fallback) return fallback;
+  return GOOGLE_SIGNIN_INCOMPLETE;
 }
 
 async function fetchGoogleUser(accessToken: string): Promise<AuthUser | null> {
@@ -239,10 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[AUTH GOOGLE] exchange code failed:", exchangeError);
         return {
           ok: false,
-          reason: normalizeGoogleAuthErrorReason(
-            exchangeError,
-            "Google sign-in could not be completed.",
-          ),
+          reason: normalizeGoogleAuthErrorReason(exchangeError, GOOGLE_SIGNIN_INCOMPLETE),
         };
       }
       const { data: sessionData } = await supabase.auth.getSession();
@@ -278,7 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ok: false,
         reason: normalizeGoogleAuthErrorReason(
           { message: "OAuth callback missing required session tokens." },
-          "Google sign-in could not be completed.",
+          GOOGLE_SIGNIN_INCOMPLETE,
         ),
       };
     }
@@ -291,10 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[AUTH GOOGLE] setSession failed:", setSessionError);
       return {
         ok: false,
-        reason: normalizeGoogleAuthErrorReason(
-          setSessionError,
-          "Google sign-in could not be completed.",
-        ),
+        reason: normalizeGoogleAuthErrorReason(setSessionError, GOOGLE_SIGNIN_INCOMPLETE),
       };
     }
 
@@ -555,19 +550,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (browserResult.type === "success" && browserResult.url) {
         return await finalizeSessionFromUrl(browserResult.url);
       }
+      if (browserResult.type === "cancel") {
+        return {
+          ok: false,
+          reason: "Google sign-in was cancelled.",
+        };
+      }
+
+      qaLog("AUTH", "oauth browser returned without callback - checking session", {
+        type: browserResult.type,
+      });
+      const { data: postBrowserSession } = await supabase.auth.getSession();
+      const recovered = !!postBrowserSession.session?.user;
+      qaLog("AUTH", "oauth session recovered after browser result", { hasSession: recovered });
+      if (recovered) {
+        await AsyncStorage.setItem(GUEST_KEY, "0");
+
+        const session = postBrowserSession.session;
+        if (session?.user) {
+          setSession(session);
+          setUser(session.user);
+
+          userRef.current = session.user;
+          setMode("authenticated");
+
+          const nextProfile = {
+            id: session.user.id,
+            email: session.user.email ?? "",
+            name:
+              (session.user.user_metadata?.full_name as string | undefined) ||
+              (session.user.user_metadata?.name as string | undefined) ||
+              session.user.email ||
+              "Vexo User",
+            avatarUrl: session.user.user_metadata?.avatar_url as string | undefined,
+          };
+
+          setProfile(nextProfile);
+        }
+
+        return { ok: true };
+      }
+
       return {
         ok: false,
-        reason:
-          browserResult.type === "cancel"
-            ? "Google sign-in was cancelled."
-            : "Google sign-in did not return a callback URL.",
+        reason: "Google sign-in did not return a callback URL.",
       };
 
     } catch (error) {
       console.log("[AUTH GOOGLE] unexpected sign-in exception:", error);
       return {
         ok: false,
-        reason: normalizeGoogleAuthErrorReason(error, "Google sign-in failed. Try again."),
+        reason: normalizeGoogleAuthErrorReason(error, GOOGLE_SIGNIN_INCOMPLETE),
       };
     } finally {
       setIsAuthenticating(false);

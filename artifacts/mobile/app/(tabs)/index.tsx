@@ -55,7 +55,7 @@ const RECOMMENDED_LINKS = [
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user, isHydrated } = useAuth();
   const { items, categories, searchItems, deleteItem } = useSavedItems();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,6 +65,7 @@ export default function HomeScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [tutorialChecked, setTutorialChecked] = useState(false);
 
   const androidBottomSpace = Math.max(insets.bottom, 20);
 
@@ -73,6 +74,8 @@ export default function HomeScreen() {
 
   const listBottomPad = tabBarHeight + 24;
   const plusBottom = tabBarHeight - 28;
+
+  const isReadyForTutorialCheck = isHydrated && (user ? !!profile?.id : true);
 
   const displayedItems = useMemo(() => {
     let list = searchQuery.trim() ? searchItems(searchQuery) : items;
@@ -110,21 +113,53 @@ export default function HomeScreen() {
   }, [items.length, displayedItems.length, hasAnyItems, isFirstTimeEmpty, searchQuery, selectedCategory]);
 
   useEffect(() => {
-    const key = `vexo_tutorial_seen:${profile?.id || "default"}`;
+    if (!isReadyForTutorialCheck) {
+      setShowTutorial(false);
+      setTutorialChecked(false);
+      return;
+    }
+    const key =
+      profile?.id != null && profile.id !== ""
+        ? `vexo_tutorial_seen:${profile.id}`
+        : !user
+          ? `vexo_tutorial_seen:guest`
+          : null;
+
+    if (!key) {
+      setShowTutorial(false);
+      setTutorialChecked(true);
+      return;
+    }
+
+    setTutorialChecked(false);
     void AsyncStorage.getItem(key)
       .then((stored) => {
         if (!stored) {
           setTutorialStep(0);
           setShowTutorial(true);
+        } else {
+          setShowTutorial(false);
         }
       })
       .catch(() => {
-        // Do not block usage if storage fails.
+        setShowTutorial(false);
+      })
+      .finally(() => {
+        setTutorialChecked(true);
       });
-  }, [profile?.id]);
+  }, [isReadyForTutorialCheck, user, profile?.id]);
 
   async function dismissTutorial() {
-    const key = `vexo_tutorial_seen:${profile?.id || "default"}`;
+    const key =
+      profile?.id != null && profile.id !== ""
+        ? `vexo_tutorial_seen:${profile.id}`
+        : !user
+          ? `vexo_tutorial_seen:guest`
+          : null;
+    if (!key) {
+      setShowTutorial(false);
+      return;
+    }
     try {
       await AsyncStorage.setItem(key, "1");
     } catch {
@@ -385,14 +420,14 @@ export default function HomeScreen() {
         )}
       />
 
-      {!selectionMode && !showTutorial ? (
+      {!selectionMode && !(tutorialChecked && showTutorial) ? (
         <FloatingAddButton
           onPress={() => router.push("/add")}
           bottomOffset={plusBottom}
         />
       ) : null}
 
-      {showTutorial ? (
+      {tutorialChecked && showTutorial ? (
         <View style={styles.tutorialOverlay}>
           <View style={styles.tutorialCard}>
             <LinearGradient

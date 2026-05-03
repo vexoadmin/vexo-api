@@ -203,7 +203,10 @@ export default function ItemScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 28 },
+          {
+            paddingTop: insets.top + 10,
+            paddingBottom: insets.bottom + 120,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -446,7 +449,7 @@ export default function ItemScreen() {
               </Pressable>
             ) : null}
 
-            <View style={styles.editActions}>
+            <View style={[styles.editActions, { paddingBottom: insets.bottom + 24 }]}>
               <Pressable style={styles.cancelBtn} onPress={cancelEdit}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </Pressable>
@@ -464,19 +467,35 @@ export default function ItemScreen() {
             {currentItem.url}
           </Text>
         </View>
-
-        <View style={styles.actions}>
-          <Pressable style={styles.deleteBtn} onPress={removeItem}>
-            <Feather name="trash-2" size={17} color="#fff" />
-            <Text style={styles.actionText}>Delete</Text>
-          </Pressable>
-
-          <Pressable style={styles.openBtn} onPress={openLink}>
-            <Feather name="external-link" size={17} color="#fff" />
-            <Text style={styles.actionText}>Open original</Text>
-          </Pressable>
-        </View>
       </KeyboardAwareScrollView>
+
+      <View
+        style={[
+          styles.actions,
+          {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: insets.bottom + 16,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+            paddingBottom: 12,
+            backgroundColor: BG,
+            borderTopWidth: 1,
+            borderTopColor: BORDER,
+          },
+        ]}
+      >
+        <Pressable style={styles.deleteBtn} onPress={removeItem}>
+          <Feather name="trash-2" size={17} color="#fff" />
+          <Text style={styles.actionText}>Delete</Text>
+        </Pressable>
+
+        <Pressable style={styles.openBtn} onPress={openLink}>
+          <Feather name="external-link" size={17} color="#fff" />
+          <Text style={styles.actionText}>Open original</Text>
+        </Pressable>
+      </View>
 
       {showDatePicker && Platform.OS !== "web" ? (
         <DateTimePicker

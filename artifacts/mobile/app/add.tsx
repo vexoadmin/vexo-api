@@ -236,6 +236,7 @@ export default function AddScreen() {
 
   const [fetchedMeta, setFetchedMeta] = useState<VideoMetadata | null>(null);
   const [metaLoading, setMetaLoading] = useState(false);
+  const [metadataRetryPending, setMetadataRetryPending] = useState(false);
   const [previewImgError, setPreviewImgError] = useState(false);
 
   const [urlError, setUrlError] = useState("");
@@ -352,6 +353,7 @@ export default function AddScreen() {
       requestIdRef.current += 1;
       setFetchedMeta(null);
       setMetaLoading(false);
+      setMetadataRetryPending(false);
       setPreviewImgError(false);
       return;
     }
@@ -404,22 +406,71 @@ export default function AddScreen() {
     let cancelled = false;
 
     const timer = setTimeout(async () => {
-      const TIMEOUT_MS = 9000;
+      const METADATA_FETCH_MS = 9000;
+      const RETRY_DELAY_MS = 700;
 
-      const timeoutPromise = new Promise<VideoMetadata>((resolve) =>
-        setTimeout(() => resolve({}), TIMEOUT_MS)
-      );
+      type FetchRace = { kind: "ok"; meta: VideoMetadata } | { kind: "timeout" };
+
+      const raceFetch = (): Promise<FetchRace> =>
+        Promise.race([
+          fetchPreview(normalized).then((m) => ({ kind: "ok" as const, meta: m })),
+          new Promise<FetchRace>((resolve) =>
+            setTimeout(() => resolve({ kind: "timeout" }), METADATA_FETCH_MS),
+          ),
+        ]);
 
       let meta: VideoMetadata = {};
-
+      let firstRace: FetchRace;
       try {
-        meta = await Promise.race([
-          fetchPreview(normalized),
-          timeoutPromise,
-        ]);
+        firstRace = await raceFetch();
       } catch {
-        meta = {};
+        firstRace = { kind: "timeout" };
       }
+
+      if (firstRace.kind === "timeout") {
+        qaLog("METADATA", "metadata fetch timeout", {
+          sequence: metadataSequence,
+          requestId: currentRequestId,
+          url: normalized,
+        });
+        if (!cancelled && requestIdRef.current === currentRequestId) {
+          setMetadataRetryPending(true);
+          try {
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+            if (!cancelled && requestIdRef.current === currentRequestId) {
+              qaLog("METADATA", "metadata retry start", {
+                sequence: metadataSequence,
+                requestId: currentRequestId,
+                url: normalized,
+              });
+              let retryRace: FetchRace;
+              try {
+                retryRace = await raceFetch();
+              } catch {
+                retryRace = { kind: "timeout" };
+              }
+              qaLog("METADATA", "metadata retry result", {
+                sequence: metadataSequence,
+                requestId: currentRequestId,
+                timedOut: retryRace.kind === "timeout",
+                titleExists:
+                  retryRace.kind === "ok" &&
+                  !!(
+                    retryRace.meta.title?.trim() ||
+                    retryRace.meta.thumbnailUrl ||
+                    retryRace.meta.fallbackImageUrl
+                  ),
+              });
+              meta = retryRace.kind === "ok" ? retryRace.meta : {};
+            }
+          } finally {
+            setMetadataRetryPending(false);
+          }
+        }
+      } else {
+        meta = firstRace.meta;
+      }
+
       const elapsedMs = Date.now() - fetchStartedAt;
       qaLog("METADATA", "metadata fetch result", {
         sequence: metadataSequence,
@@ -438,6 +489,8 @@ export default function AddScreen() {
 
       if (cancelled || requestIdRef.current !== currentRequestId) {
         console.log("PREVIEW IGNORED (stale)");
+        setMetaLoading(false);
+        setMetadataRetryPending(false);
         return;
       }
 
@@ -554,6 +607,7 @@ export default function AddScreen() {
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      setMetadataRetryPending(false);
     };
   }, [url, detectedPlatform]);
 
@@ -602,6 +656,10 @@ export default function AddScreen() {
 
   async function handleSave() {
     if (isSaving) return;
+    if (metadataRetryPending) {
+      Alert.alert("Please wait", "Preview is still loading. Try again in a moment.");
+      return;
+    }
     let valid = true;
     const normalized = normalizeUrl(url);
     const selectedCategoryMatch = categories.find(
@@ -671,6 +729,11 @@ export default function AddScreen() {
       if (videoId) thumbnailUrl = getYoutubeThumbnail(videoId);
     }
 
+    if (!title && !thumbnailUrl) {
+      Alert.alert("Preview not ready", "Please wait a moment and try again.");
+      return;
+    }
+
     console.log("AddScreen metadata before save:", {
       url: normalized,
       detectedPlatform,
@@ -696,7 +759,7 @@ export default function AddScreen() {
       thumbnail_url: addPayload.thumbnailUrl,
       url: addPayload.url,
     });
-    qaLog("METADATA", "final title/thumbnail saved", {
+    qaLog("METADATA", "final title/thumbnail before save", {
       finalTitle,
       thumbnailUrl: addPayload.thumbnailUrl ?? null,
       url: addPayload.url,
@@ -1219,11 +1282,13 @@ export default function AddScreen() {
 
         <Pressable
           onPress={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || metadataRetryPending}
           style={({ pressed }) => [
             styles.saveWrap,
             { marginBottom: saveFooterBottomSpacing },
-            { opacity: isSaving ? 0.7 : pressed ? 0.85 : 1 },
+            {
+              opacity: isSaving || metadataRetryPending ? 0.7 : pressed ? 0.85 : 1,
+            },
           ]}
         >
           <LinearGradient
