@@ -6,6 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as ExpoLinking from "expo-linking";
 import { useShareIntent } from "expo-share-intent";
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -20,7 +21,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SavedItemsProvider } from "@/contexts/SavedItemsContext";
 import { useColors } from "@/hooks/useColors";
-import { normalizeAuthHashToQueryForParse } from "@/utils/authDeepLinkUrl";
+import { supabase } from "@/lib/supabase";
+import { extractOAuthTokensFromVexoAuthUrl, normalizeAuthHashToQueryForParse } from "@/utils/authDeepLinkUrl";
 import { nextQaSequence, qaLog } from "@/utils/qaDebugLog";
 
 SplashScreen.preventAutoHideAsync();
@@ -62,6 +64,41 @@ function RootLayoutNav() {
   }, [hasShareIntent, shareIntent, resetShareIntent]);
 
   const shareIntentFingerprint = `${shareIntent?.text ?? ""}\u001f${shareIntent?.webUrl ?? ""}`;
+
+  const authOAuthDeepLinkAttachedRef = useRef(false);
+  useEffect(() => {
+    if (authOAuthDeepLinkAttachedRef.current) return;
+    authOAuthDeepLinkAttachedRef.current = true;
+
+    const applyVexoAuthTokensFromUrl = async (incoming: string | null) => {
+      if (!incoming) return;
+      const lower = incoming.toLowerCase();
+      if (!lower.startsWith("vexo://auth")) return;
+      if (lower.startsWith("vexo://auth/reset-password")) return;
+
+      const { accessToken, refreshToken } = extractOAuthTokensFromVexoAuthUrl(incoming);
+      if (!accessToken || !refreshToken) return;
+
+      qaLog("AUTH", "root layout vexo auth deep link setSession", { hasTokens: true });
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (error) {
+        qaLog("AUTH", "root layout setSession failed", { message: error.message });
+      }
+    };
+
+    void ExpoLinking.getInitialURL().then((url) => void applyVexoAuthTokensFromUrl(url));
+    const subscription = ExpoLinking.addEventListener("url", ({ url }) => {
+      void applyVexoAuthTokensFromUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+      authOAuthDeepLinkAttachedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     console.log("[AUTH DEBUG] layout auth state:", {

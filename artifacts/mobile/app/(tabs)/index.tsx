@@ -55,7 +55,7 @@ const RECOMMENDED_LINKS = [
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, user, isHydrated } = useAuth();
+  const { profile, user, isHydrated, isProfileSupabaseReady, session } = useAuth();
   const { items, categories, searchItems, deleteItem } = useSavedItems();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,7 +75,19 @@ export default function HomeScreen() {
   const listBottomPad = tabBarHeight + 24;
   const plusBottom = tabBarHeight - 28;
 
-  const isReadyForTutorialCheck = isHydrated && (user ? !!profile?.id : true);
+  /** Logged-in: only after profile matches user and Supabase profile check finished. Guest: explicit signed-out (no user, no session). */
+  const isClearlyNotLoggedIn =
+    isHydrated && !user && !session;
+  const hasConfirmedProfileForUser =
+    Boolean(
+      user &&
+        profile &&
+        profile.id &&
+        user.id &&
+        profile.id === user.id &&
+        isProfileSupabaseReady,
+    );
+  const isReadyForTutorialCheck = isClearlyNotLoggedIn || hasConfirmedProfileForUser;
 
   const displayedItems = useMemo(() => {
     let list = searchQuery.trim() ? searchItems(searchQuery) : items;
@@ -118,16 +130,15 @@ export default function HomeScreen() {
       setTutorialChecked(false);
       return;
     }
-    const key =
-      profile?.id != null && profile.id !== ""
-        ? `vexo_tutorial_seen:${profile.id}`
-        : !user
-          ? `vexo_tutorial_seen:guest`
-          : null;
+    const key = hasConfirmedProfileForUser
+      ? `vexo_tutorial_seen:${profile!.id}`
+      : isClearlyNotLoggedIn
+        ? `vexo_tutorial_seen:guest`
+        : null;
 
     if (!key) {
       setShowTutorial(false);
-      setTutorialChecked(true);
+      setTutorialChecked(false);
       return;
     }
 
@@ -147,15 +158,20 @@ export default function HomeScreen() {
       .finally(() => {
         setTutorialChecked(true);
       });
-  }, [isReadyForTutorialCheck, user, profile?.id]);
+  }, [
+    isReadyForTutorialCheck,
+    hasConfirmedProfileForUser,
+    isClearlyNotLoggedIn,
+    user?.id,
+    profile?.id,
+  ]);
 
   async function dismissTutorial() {
-    const key =
-      profile?.id != null && profile.id !== ""
-        ? `vexo_tutorial_seen:${profile.id}`
-        : !user
-          ? `vexo_tutorial_seen:guest`
-          : null;
+    const key = hasConfirmedProfileForUser
+      ? `vexo_tutorial_seen:${profile!.id}`
+      : isClearlyNotLoggedIn
+        ? `vexo_tutorial_seen:guest`
+        : null;
     if (!key) {
       setShowTutorial(false);
       return;

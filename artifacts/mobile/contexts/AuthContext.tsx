@@ -3,6 +3,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { type Session, type User } from "@supabase/supabase-js";
+import { router } from "expo-router";
 
 import { supabase } from "@/lib/supabase";
 import { normalizeAuthHashToQueryForParse } from "@/utils/authDeepLinkUrl";
@@ -31,6 +32,8 @@ type AuthContextValue = {
   profile: AuthUser | null;
   session: Session | null;
   isHydrated: boolean;
+  /** After sign-in, true once `profiles` has been queried for the current user (avoids tutorial flash during sync). */
+  isProfileSupabaseReady: boolean;
   isAuthenticating: boolean;
   signInWithGoogle: () => Promise<AuthActionResult>;
   signUpWithEmail: (
@@ -187,12 +190,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isProfileSupabaseReady, setIsProfileSupabaseReady] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const userRef = useRef<User | null>(null);
 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsProfileSupabaseReady(true);
+      return;
+    }
+    let cancelled = false;
+    setIsProfileSupabaseReady(false);
+    void (async () => {
+      try {
+        await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
+      } catch {
+        // non-blocking
+      } finally {
+        if (!cancelled) {
+          setIsProfileSupabaseReady(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   async function setSessionFromResetUrl(url: string): Promise<void> {
     const normalized = normalizeAuthHashToQueryForParse(url);
@@ -418,8 +445,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (nextSession?.user) {
+        if (event === "SIGNED_IN") {
+          console.log("[AUTH DEBUG] SIGNED_IN: applying session and user immediately", {
+            userId: nextSession.user.id,
+            email: nextSession.user.email ?? null,
+          });
+          qaLog("AUTH", "SIGNED_IN", {
+            userId: nextSession.user.id,
+            email: nextSession.user.email ?? null,
+            hasSession: true,
+          });
+        }
+
         userRef.current = nextSession.user;
         setSession(nextSession);
+        setUser(nextSession.user);
         const nextProfile: AuthUser = {
           id: nextSession.user.id,
           email: nextSession.user.email ?? "",
@@ -432,20 +472,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             | string
             | undefined,
         };
-        console.log("[AUTH DEBUG] user state set:", {
+        setProfile(nextProfile);
+        setMode("authenticated");
+        setIsHydrated(true);
+
+        console.log("[AUTH DEBUG] user state set from onAuthStateChange:", {
+          event,
           userId: nextSession.user.id,
           email: nextSession.user.email ?? null,
         });
         qaLog("AUTH", "user set from onAuthStateChange", {
+          event,
           userId: nextSession.user.id,
           email: nextSession.user.email ?? null,
         });
-        setUser(nextSession.user);
-        setProfile(nextProfile);
-        setMode("authenticated");
+
         void AsyncStorage.setItem(GUEST_KEY, "0");
         void ensureProfileRow(nextProfile);
-        qaLog("AUTH", "session preserved", { hasUser: true });
+        qaLog("AUTH", "onAuthStateChange session applied", { event, hasUser: true });
+        if (event === "SIGNED_IN") {
+          router.replace("/");
+        }
         return;
       }
 
@@ -761,6 +808,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    setIsProfileSupabaseReady(true);
     await AsyncStorage.setItem(GUEST_KEY, "0");
   }
 
@@ -771,6 +819,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       session,
       isHydrated,
+      isProfileSupabaseReady,
       isAuthenticating,
       signInWithGoogle,
       signUpWithEmail,
@@ -779,7 +828,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updatePassword,
       signOut,
     }),
-    [mode, user, profile, session, isHydrated, isAuthenticating],
+    [mode, user, profile, session, isHydrated, isProfileSupabaseReady, isAuthenticating],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
