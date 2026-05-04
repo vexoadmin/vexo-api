@@ -199,21 +199,23 @@ export default function ItemScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      <KeyboardAwareScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: insets.top + 10,
-            paddingBottom: insets.bottom + 120,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        enableOnAndroid={true}
-        extraScrollHeight={120}
-        extraHeight={120}
-      >
+      <View style={styles.main}>
+        <KeyboardAwareScrollView
+          style={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: insets.top + 10,
+              paddingBottom: 24,
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          enableOnAndroid={true}
+          extraScrollHeight={120}
+          extraHeight={120}
+        >
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Feather name="arrow-left" size={28} color="#fff" />
@@ -449,7 +451,7 @@ export default function ItemScreen() {
               </Pressable>
             ) : null}
 
-            <View style={[styles.editActions, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={[styles.editActions, { paddingBottom: 12 }]}>
               <Pressable style={styles.cancelBtn} onPress={cancelEdit}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </Pressable>
@@ -467,34 +469,24 @@ export default function ItemScreen() {
             {currentItem.url}
           </Text>
         </View>
-      </KeyboardAwareScrollView>
+        </KeyboardAwareScrollView>
 
-      <View
-        style={[
-          styles.actions,
-          {
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: insets.bottom + 16,
-            paddingHorizontal: 20,
-            paddingTop: 12,
-            paddingBottom: 12,
-            backgroundColor: BG,
-            borderTopWidth: 1,
-            borderTopColor: BORDER,
-          },
-        ]}
-      >
-        <Pressable style={styles.deleteBtn} onPress={removeItem}>
-          <Feather name="trash-2" size={17} color="#fff" />
-          <Text style={styles.actionText}>Delete</Text>
-        </Pressable>
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
+          <Pressable style={styles.deleteBtn} onPress={removeItem}>
+            <Feather name="trash-2" size={17} color="#fff" />
+            <Text style={styles.actionText}>Delete</Text>
+          </Pressable>
 
-        <Pressable style={styles.openBtn} onPress={openLink}>
-          <Feather name="external-link" size={17} color="#fff" />
-          <Text style={styles.actionText}>Open original</Text>
-        </Pressable>
+          <Pressable style={styles.openBtn} onPress={openLink}>
+            <Feather name="external-link" size={17} color="#fff" />
+            <Text style={styles.actionText}>Open original</Text>
+          </Pressable>
+        </View>
       </View>
 
       {showDatePicker && Platform.OS !== "web" ? (
@@ -529,6 +521,10 @@ export default function ItemScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
+
+  main: { flex: 1 },
+
+  scroll: { flex: 1 },
 
   content: {
     paddingHorizontal: 20,
@@ -885,9 +881,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
 
-  actions: {
+  footer: {
     flexDirection: "row",
     gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: BG,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
   },
 
   deleteBtn: {

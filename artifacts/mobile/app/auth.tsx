@@ -5,7 +5,6 @@ import * as Linking from "expo-linking";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -72,22 +71,12 @@ export function AuthScreenContent({
   async function handleGoogleLogin() {
     setErrorMessage("");
     setSuccessMessage("");
-    console.log("[AUTH DEBUG] Google login trigger start");
     try {
-      const result = await signInWithGoogle();
-      console.log("[AUTH DEBUG] Google login result:", result);
-      if (!result.ok) {
-        const message = result.reason || "Unable to sign in with Google.";
-        setErrorMessage(message);
-        Alert.alert("Google sign-in failed", message);
-        return;
-      }
-      onFinished?.();
+      await signInWithGoogle();
     } catch (error) {
-      console.log("[AUTH DEBUG] Google login error object:", error);
-      const message = "Unable to sign in with Google.";
-      setErrorMessage(message);
-      Alert.alert("Google sign-in failed", message);
+      if (error instanceof Error && error.message !== "Google sign-in could not be completed.") {
+        setErrorMessage(error.message);
+      }
     }
   }
 
@@ -265,10 +254,21 @@ export function AuthScreenContent({
         {!isSignup && (
           <Pressable
             onPress={handleGoogleLogin}
-            style={({ pressed }) => [styles.secondaryBtn, pressed ? { opacity: 0.85 } : null]}
+            disabled={isAuthenticating}
+            style={({ pressed }) => [
+              styles.secondaryBtn,
+              pressed && !isAuthenticating ? { opacity: 0.85 } : null,
+              isAuthenticating ? { opacity: 0.7 } : null,
+            ]}
           >
-            <Feather name="log-in" size={16} color="#A5F3FC" />
-            <Text style={styles.secondaryBtnText}>Continue with Google</Text>
+            {isAuthenticating ? (
+              <ActivityIndicator color="#A5F3FC" />
+            ) : (
+              <>
+                <Feather name="log-in" size={16} color="#A5F3FC" />
+                <Text style={styles.secondaryBtnText}>Continue with Google</Text>
+              </>
+            )}
           </Pressable>
         )}
 

@@ -552,29 +552,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   }, []);
 
-  async function waitForSessionAfterOAuth(timeoutMs = 20000): Promise<boolean> {
-    const started = Date.now();
-    while (Date.now() - started < timeoutMs) {
-      const { data } = await supabase.auth.getSession();
-      const hasSession = !!data.session?.user;
-      qaLog("AUTH", "oauth wait session tick", { hasSession });
-      if (hasSession) {
-        qaLog("AUTH", "oauth wait session resolved", { hasSession: true });
-        return true;
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    qaLog("AUTH", "oauth wait session resolved", { hasSession: false });
-    return false;
-  }
-
   async function signInWithGoogle(): Promise<AuthActionResult> {
     setIsAuthenticating(true);
     try {
       const redirectTo = "vexo://auth";
-      console.log("[GOOGLE DEBUG] before signInWithOAuth");
-      console.log("[AUTH DEBUG] redirectTo computed:", redirectTo);
-      console.log("Google OAuth redirectTo:", redirectTo);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -582,83 +563,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           skipBrowserRedirect: true,
         },
       });
-      console.log("[GOOGLE DEBUG] after signInWithOAuth:", {
-        hasUrl: !!data?.url,
-        hasError: !!error,
-      });
-      console.log("Google OAuth data.url:", data?.url);
 
       if (error || !data?.url) {
-        console.log("[AUTH GOOGLE] signInWithOAuth failed:", error || "missing data.url");
-        return {
-          ok: false,
-          reason: normalizeGoogleAuthErrorReason(
-            error || { message: "Failed to start Google sign-in." },
-            "Google sign-in could not be started.",
-          ),
-        };
+        throw new Error("Google sign-in could not be started.");
       }
 
-      console.log("[GOOGLE DEBUG] before opening browser/url");
       const browserResult = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      const browserResultHasUrl =
-        "url" in browserResult &&
-        typeof browserResult.url === "string" &&
-        browserResult.url.length > 0;
-      console.log("[GOOGLE DEBUG] after browser/url returns:", {
-        type: browserResult.type,
-        hasUrl: browserResultHasUrl,
-      });
-      console.log("[AUTH DEBUG] openAuthSessionAsync result:", browserResult);
-      if (browserResult.type === "success" && browserResult.url) {
-        return await finalizeSessionFromUrl(browserResult.url);
-      }
-      if (browserResult.type === "cancel") {
-        return {
-          ok: false,
-          reason: "Google sign-in was cancelled.",
-        };
-      }
 
-      qaLog("AUTH", "oauth browser returned without callback - checking session", {
-        type: browserResult.type,
-      });
-      const recovered = await waitForSessionAfterOAuth(20000);
-      if (recovered) {
-        const { data: postBrowserSession } = await supabase.auth.getSession();
-        const session = postBrowserSession.session;
-        if (session?.user) {
-          setSession(session);
-          setUser(session.user);
-          userRef.current = session.user;
-          setMode("authenticated");
-          const nextProfile: AuthUser = {
-            id: session.user.id,
-            email: session.user.email ?? "",
-            name:
-              (session.user.user_metadata?.full_name as string | undefined) ||
-              (session.user.user_metadata?.name as string | undefined) ||
-              session.user.email ||
-              "Vexo User",
-            avatarUrl: session.user.user_metadata?.avatar_url as string | undefined,
-          };
-          setProfile(nextProfile);
-        }
-        await AsyncStorage.setItem(GUEST_KEY, "0");
+      if (browserResult.type === "cancel" || browserResult.type === "dismiss") {
+        void supabase.auth.getSession();
         return { ok: true };
       }
 
-      return {
-        ok: false,
-        reason: "Google sign-in did not return a callback URL.",
-      };
+      if (browserResult.type === "success" && browserResult.url) {
+        const finalized = await finalizeSessionFromUrl(browserResult.url);
+        if (!finalized.ok) {
+          return { ok: true };
+        }
+        return { ok: true };
+      }
 
+      return { ok: true };
     } catch (error) {
-      console.log("[AUTH GOOGLE] unexpected sign-in exception:", error);
-      return {
-        ok: false,
-        reason: normalizeGoogleAuthErrorReason(error, GOOGLE_SIGNIN_INCOMPLETE),
-      };
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Google sign-in could not be completed.");
     } finally {
       setIsAuthenticating(false);
     }

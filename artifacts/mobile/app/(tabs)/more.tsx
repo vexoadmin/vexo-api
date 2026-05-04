@@ -421,23 +421,6 @@ export default function MoreScreen() {
         </View>
 
         <View style={styles.sectionLabel}>
-          <Text style={styles.sectionLabelText}>QA DEBUG</Text>
-        </View>
-
-        <View style={styles.card}>
-          <ActionRow
-            icon="activity"
-            label="View debug logs"
-            description="TODO: remove before production."
-            iconColor="#F59E0B"
-            onPress={() => {
-              router.push("/qa-debug");
-            }}
-            isLast
-          />
-        </View>
-
-        <View style={styles.sectionLabel}>
           <Text style={styles.sectionLabelText}>ABOUT</Text>
         </View>
 
